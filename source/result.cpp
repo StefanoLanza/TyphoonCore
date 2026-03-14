@@ -1,5 +1,6 @@
 #include "result.h"
 #include <cassert>
+#include <cstring>
 
 namespace Typhoon {
 
@@ -13,7 +14,7 @@ Result::Result(const char* errorMessage)
 
 void Result::setErrorMessage(std::string_view message) {
 	size_t end = std::min(sizeof(tempBuffer) - 1, message.length());
-	memcpy(tempBuffer, message.data(), end);
+	std::memcpy(tempBuffer, message.data(), end);
 	tempBuffer[end] = 0; // ensure null termination
 	errorMessage = tempBuffer;
 }
