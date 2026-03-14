@@ -100,7 +100,7 @@ inline constexpr void Bitmask<EnumType>::flip(EnumType bit) {
 
 template <class EnumType>
 inline constexpr bool operator==(Bitmask<EnumType> mask0, Bitmask<EnumType> mask1) noexcept {
-	return mask0.bits == mask1.bits;
+	return mask0.value() == mask1.value();
 }
 
 template <class EnumType>
