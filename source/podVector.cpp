@@ -1,5 +1,3 @@
 #include "podVector.h"
 
-namespace Typhoon
-{
-}
+namespace Typhoon {}
