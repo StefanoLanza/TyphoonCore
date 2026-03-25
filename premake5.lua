@@ -94,11 +94,7 @@ filter { filter_clang, filter_debug, }
 
 filter {}
 
-project("Core")
-	kind "StaticLib"
-	files "include/**.*"
-	files "source/**.*"
-	includedirs { "include/core", "include", }
+require "core"
 
 if _OPTIONS["with-tests"] then
 	project("Catch")
@@ -109,6 +105,7 @@ if _OPTIONS["with-tests"] then
 	project("UnitTest")
 		kind "ConsoleApp"
 		files "test/**.*"
-		externalincludedirs { "include", "external", }
-		links({"Core", "Catch", })
+		includedirs { "external", } --Catch
+		uses { "Core", }
+		links({ "Catch", })
 end

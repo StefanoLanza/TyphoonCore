@@ -14,27 +14,27 @@
 
 namespace Typhoon {
 
-typedef unsigned char  u_char;
-typedef unsigned char  uchar;
-typedef unsigned short u_short;
-typedef unsigned short ushort;
-typedef unsigned int   u_int;
-typedef unsigned int   uint;
-typedef unsigned long  u_long;
-typedef unsigned long  ulong;
-typedef int8_t         int8;
-typedef int16_t        int16;
-typedef int32_t        int32;
-typedef int64_t        int64;
-typedef uint8_t        uint8;
-typedef uint16_t       uint16;
-typedef uint32_t       uint32;
-typedef uint64_t       uint64;
-typedef float          f32;
-typedef double         f64;
-typedef uint8_t        byte;
-typedef uint16_t       word;
-typedef uint32_t       dword;
+using u_char = unsigned char;
+using uchar = unsigned char;
+using u_short = unsigned short;
+using ushort = unsigned short;
+using u_int = unsigned int;
+using uint = unsigned int;
+using u_long = unsigned long;
+using ulong = unsigned long;
+using int8 = int8_t;
+using int16 = int16_t;
+using int32 = int32_t;
+using int64 = int64_t;
+using uint8 = uint8_t;
+using uint16 = uint16_t;
+using uint32 = uint32_t;
+using uint64 = uint64_t;
+using f32 = float;
+using f64 = double;
+using byte = uint8_t;
+using word = uint16_t;
+using dword = uint32_t;
 
 } // namespace Typhoon
 
