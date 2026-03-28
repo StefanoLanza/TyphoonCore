@@ -13,10 +13,6 @@
 	#define FORCE_INLINE
 #endif
 
-#define UNUSED(x) [[maybe_unused]] x
-
-#define TY_DEPRECATED __declspec(deprecated)
-
 namespace Typhoon {
 
 using u_char = unsigned char;
@@ -59,27 +55,6 @@ using dword = uint32_t;
 #define NOTE(x)  MacroMessage("NOTE : " #x)
 #define TODO(x)  MacroMessage("TODO :   " #x)
 #define FIXME(x) MacroMessage("FIXME :   " #x)
-
-#define RUN_ONCE(code)                                             \
-	__pragma(warning(push)) __pragma(warning(disable : 4127)) do { \
-		static bool done = 0;                                      \
-		if (! done) {                                              \
-			done = 1;                                              \
-			code;                                                  \
-		}                                                          \
-	}                                                              \
-	while (0)                                                      \
-	__pragma(warning(pop))
-
-#ifndef SAFE_RELEASE
-#define SAFE_RELEASE(p)     \
-	do {                    \
-		if (p) {            \
-			(p)->Release(); \
-			(p) = NULL;     \
-		}                   \
-	while (false) }
-#endif
 
 #define TOKENPASTE(x, y)  x##y
 #define TOKENPASTE2(x, y) TOKENPASTE(x, y)
