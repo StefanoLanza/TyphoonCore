@@ -2,10 +2,15 @@
 
 #include <cstdint>
 
-#define RESTRICT __restrict
-
-#ifndef FORCEINLINE
-#define FORCEINLINE __forceinline
+#if defined(_MSC_VER)
+	#define RESTRICT __restrict
+	#define FORCEINLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+	#define RESTRICT __restrict__
+	#define FORCE_INLINE inline __attribute__((always_inline))
+#else
+	#define RESTRICT
+	#define FORCE_INLINE
 #endif
 
 #define UNUSED(x) [[maybe_unused]] x
