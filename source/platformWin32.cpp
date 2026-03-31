@@ -6,7 +6,10 @@
 #include <filesystem>
 
 // clang-format off
+
+#define NOMINMAX
 #include <windows.h>
+
 #include <minwindef.h>
 #include <sys/utime.h>
 // clang-format on
