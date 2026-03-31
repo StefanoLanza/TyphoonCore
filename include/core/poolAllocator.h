@@ -10,67 +10,56 @@ class Allocator;
 
 class BasePoolAllocator {
 protected:
-	BasePoolAllocator(Allocator& baseAllocator, size_t capacity, size_t elementSize, size_t alignment);
+	BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment);
 	~BasePoolAllocator();
 
 	void*  alloc();
 	void   free(void* ptr);
-	//size_t getIndex(const void* ptr) const;
-	//void*  getPtr(size_t index) const;
 	void   clear();
+	size_t getCapacity() const;
+
+private:
+	void init();
 
 private:
 	struct FreeSlot;
-	struct Page;
 
-	void* allocFromPage(Page& page) const;
-	Page* allocPage();
-	void  freePage(Page& page);
-
-	Allocator& baseAllocator;
-	size_t     pageSize;
-	Page*      rootPage;
+	Allocator& backingAllocator;
+	size_t     maxElements;
 	size_t     elementSize;
 	size_t     alignment;
+	void*      buffer;
+	FreeSlot*  nextFreeSlot;
 };
 
 template <class T>
-class PoolAllocator : private BasePoolAllocator {
+class PoolAllocator final : private BasePoolAllocator {
 public:
-	PoolAllocator(Allocator& baseAllocator, size_t capacity = 65536)
-	    : BasePoolAllocator(baseAllocator, capacity, sizeof(T), alignof(T)) {
+	explicit PoolAllocator(Allocator& backingAllocator, size_t maxElements)
+	    : BasePoolAllocator(backingAllocator, maxElements, sizeof(T), alignof(T)) {
+		static_assert(sizeof(T) % alignof(T) == 0);
 	}
 
 	template <class... ArgTypes>
-	T* tryMake(ArgTypes&&... args) {
-		void* ptr = alloc();
-		return ptr ? new (ptr) T(std::forward<ArgTypes>(args)...) : nullptr;
-	}
-	template <class... ArgTypes>
-	T* make(ArgTypes&&... args) {
+	T* create(ArgTypes&&... args) {
 		void* ptr = alloc();
 		assert(ptr);
 		return new (ptr) T(std::forward<ArgTypes>(args)...);
 	}
 	void destroy(T* ptr) {
-		if (ptr) {
+		assert(ptr);
+		if constexpr (! std::is_trivially_destructible_v<T>) {
 			ptr->~T();
-			free(ptr);
 		}
+		free(ptr);
 	}
 
-	//using BasePoolAllocator::getIndex;
-	using BasePoolAllocator::clear;
-
-#if 0
-	void destroyAt(size_t index) {
-		destroy(static_cast<T*>(getPtr(index)));
+	void clear() requires(std::is_trivially_destructible_v<T>) {
+		BasePoolAllocator::clear();
 	}
-
-	T& operator[](size_t index) const {
-		return *static_cast<T*>(getPtr(index));
+	void getCapacity() const {
+		return BasePoolAllocator::getCapacity();
 	}
-#endif
 };
 
 } // namespace Typhoon
