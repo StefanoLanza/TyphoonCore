@@ -2,15 +2,12 @@
 
 #include <core/base.h>
 #include <string>
-#undef SetCurrentDirectory
-
-namespace Typhoon {
 
 /*!
 \namespace Platform
 This namespace contains platform-specific functions (for files, timers...)
 */
-namespace Platform {
+namespace Typhoon::Platform {
 
 #if (defined(WIN32) || defined(WIN64))
 struct FileTime {
@@ -34,39 +31,37 @@ struct LocalTime {
 //! Query local time
 /*! \param localTime output structure
  */
-void QueryLocalTime(LocalTime& localTime);
+void queryLocalTime(LocalTime& localTime);
 
 //! Query local time
 /*! \param localTimeStr string containing the formatted local time
  */
-void QueryLocalTime(std::string& localTimeStr);
+void queryLocalTime(std::string& localTimeStr);
 
 //! Set current directory
 /*! \param directory string representing the directory
  */
-void SetCurrentDirectory(const std::string& directory);
+void setCurrentDirectory(const char* directory);
 
 //! Return the directory with the executable file
-std::string GetBinDirectory();
+std::string getBinDirectory();
 
 //! Return the default temporary directory
-void GetTempDirectory(char path[], size_t pathSize);
+void getTempDirectory(char path[], size_t pathSize);
 
 //! Return application time in seconds
-double QueryApplicationTime();
+double queryApplicationTime();
 
 //! Return application ticks
-int64 QueryApplicationTicks();
+int64 queryApplicationTicks();
 
 //! Return number of ticks per second on current system
-int64 GetTicksPerSecond();
+int64 getTicksPerSecond();
 
 //! Initialize the timer
-void InitializeTimer();
+void initializeTimer();
 
 //! Get the create and modify time of a file
-bool GetFileTimes(const char* filePath, FileTime* createTime, FileTime* modifyTime);
+bool getFileTimes(const char* filePath, FileTime* createTime, FileTime* modifyTime);
 
-} // namespace Platform
-
-} // namespace Typhoon
+} // namespace Typhoon::Platform
