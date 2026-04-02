@@ -8,16 +8,16 @@
 namespace Typhoon {
 
 template <size_t L>
-class HashedString {
+class SmallString {
 public:
-	HashedString() {
+	SmallString() {
 		storage[0] = 0;
 		hash = 0;
 	}
 
-	explicit HashedString(const char* str);
+	explicit SmallString(const char* str);
 
-	HashedString<L>& operator=(const char*);
+	SmallString<L>& operator=(const char*);
 
 	void clear() {
 		hash = 0;
@@ -35,7 +35,7 @@ public:
 		return hash;
 	}
 
-	bool operator==(const HashedString& str) const {
+	bool operator==(const SmallString& str) const {
 		return (hash == str.hash) && (! strcmp(storage, str.storage));
 	}
 
