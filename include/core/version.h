@@ -13,24 +13,4 @@ namespace Typhoon {
 
 #define TY_CORE_COMPILEDVERSION TY_CORE_VERSIONNUM(TY_CORE_MAJOR_VERSION, TY_CORE_MINOR_VERSION, TY_CORE_PATCHLEVEL)
 
-struct Version {
-	uint8_t major;
-	uint8_t minor;
-	uint8_t patch;
-};
-
-inline Version getVersion() {
-	return { TY_CORE_MAJOR_VERSION, TY_CORE_MINOR_VERSION, TY_CORE_PATCHLEVEL };
-}
-
-#define STR_HELPER(x) #x
-#define STR(x)        STR_HELPER(x)
-
-inline const char* getVersionString() {
-	return STR(TY_CORE_MAJOR_VERSION) "." STR(TY_CORE_MINOR_VERSION) "." STR(TY_CORE_PATCHLEVEL);
-}
-
-#undef STR_HELPER
-#undef STR
-
 } // namespace Typhoon
