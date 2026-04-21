@@ -93,12 +93,10 @@ void BufferAllocator::rewind() {
 }
 
 void BufferAllocator::rewind(void* ptr) {
-	if (ptr) {
-		assert(ptr >= buffer && ptr < static_cast<const char*>(buffer) + bufferSize);
-		offset = ptr;
-		lastAlloc = nullptr; // FIXME CHECK ptr;
-		++epoch;
-	}
+	assert(ptr >= buffer && ptr < static_cast<const char*>(buffer) + bufferSize);
+	offset = ptr;
+	lastAlloc = nullptr; // FIXME CHECK ptr;
+	++epoch;
 }
 
 PagedAllocator::PagedAllocator(Allocator& parentAllocator, size_t pageSize, size_t maxPages)
@@ -169,15 +167,16 @@ void PagedAllocator::rewind() {
 }
 
 void PagedAllocator::rewind(void* ptr) {
-	if (ptr) {
-		for (Page* page = currPage; page != nullptr; page = page->prev) {
-			if (ptr >= page->buffer && ptr < static_cast<const char*>(page->buffer) + page->size) {
-				page->offset = ptr;
-				currPage = page;
-				break;
-			}
+	assert(ptr);
+	for (Page* page = currPage; page != nullptr; page = page->prev) {
+		if (ptr >= page->buffer && ptr < static_cast<const char*>(page->buffer) + page->size) {
+			page->offset = ptr;
+			currPage = page;
+			++epoch;
+			return;
 		}
 	}
+	assert(false);
 }
 
 inline void* PagedAllocator::getOffset() const {

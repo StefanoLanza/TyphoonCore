@@ -37,16 +37,20 @@ inline T* advancePointer(T* ptr, ptrdiff_t offset) {
 }
 
 template <typename T>
-inline T* decoratePointer(T* ptr, uint32_t marker) {
+inline T* decoratePointer(T* ptr, uint32_t epoch) {
 	// expect pointers to be 8 bytes aligned. lowest 3 bits must zero
 	assert((reinterpret_cast<uintptr_t>(ptr) & 0b111) == 0);
-	assert(marker < 8);
-	return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) | marker);
+	assert(epoch < 8);
+	return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) | epoch);
 }
 
 template <typename T>
 inline T* undecoratePointer(T* ptr) {
 	return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) & ~0b111);
+}
+
+inline uint32_t extractMarkerFromPointer(const void* ptr) {
+	return reinterpret_cast<uintptr_t>(ptr) & 0b111;
 }
 
 } // namespace Typhoon
