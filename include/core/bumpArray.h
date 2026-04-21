@@ -99,11 +99,14 @@ public:
 
 	T* data() noexcept {
 #ifdef _DEBUG
-		assert(_epoch == _allocator->getEpoch());
+		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
 #endif
 		return _data;
 	}
 	const T* data() const noexcept {
+#ifdef _DEBUG
+		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
+#endif
 		return _data;
 	}
 	size_t size() const noexcept {

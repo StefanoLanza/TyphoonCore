@@ -30,14 +30,16 @@ void ScopedAllocator::registerObject(void* obj, size_t objSize, Destructor destr
 }
 
 void ScopedAllocator::destroyAll() {
+	void* last = nullptr;
 	for (Finalizer *f = finalizerHead, *next = nullptr; f; f = next) {
 		if (f->destructor) {
 			f->destructor(f->obj);
 		}
 		next = f->next;
-		// Important: free finalizer first
-		void* obj = f->obj;
-		allocator.rewind(obj);
+		last = f->obj;
+	}
+	if (last) {
+		allocator.rewind(last);
 	}
 	finalizerHead = nullptr;
 }
