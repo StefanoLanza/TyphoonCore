@@ -44,6 +44,7 @@ public:
 	}
 
 	void destroyAll();
+	uint32_t getEpoch() const;
 
 private:
 	using Destructor = void (*)(void* ptr);

@@ -16,7 +16,7 @@ template <typename T>
 requires std::is_trivially_copyable_v<T>&& std::is_trivially_destructible_v<T>
 #endif
 
-    class podVector {
+    class BumpArray {
 	static_assert(std::is_trivially_copyable_v<T>, "pod_vector requires trivially copyable T");
 	static_assert(std::is_trivially_destructible_v<T>, "pod_vector requires trivially destructible T");
 
@@ -26,13 +26,13 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	explicit podVector(Allocator& allocator) noexcept
+	explicit BumpArray(LinearAllocator& allocator) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
 	}
-	explicit podVector(Allocator& allocator, size_t n) noexcept
+	explicit BumpArray(Allocator& allocator, size_t n) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
@@ -43,46 +43,11 @@ public:
 		std::memset(_data, 0, _size * sizeof(T));
 	}
 
-	~podVector() {
-		if (_data) {
-			_allocator->free(_data, _cap * sizeof(T));
-		}
-	}
-
 	// not copyable
-	podVector(const podVector&) = delete;
-	podVector& operator=(const podVector&) = delete;
+	BumpArray(const BumpArray&) = delete;
+	BumpArray& operator=(const BumpArray&) = delete;
 
-#if 0
-    pod_vector(const pod_vector& other) {
-        _size = other._size;
-        _cap = other._size;
-        if (_size) {
-            _data = static_cast<T*>(std::malloc(_cap * sizeof(T)));
-            if (!_data) throw std::bad_alloc();
-            std::memcpy(_data, other._data, _size * sizeof(T));
-        } else {
-            _data = nullptr;
-        }
-    }
-
-    pod_vector& operator=(const pod_vector& other) {
-        if (this == &other) return *this;
-        // Stronger strategy: allocate new block first
-        T* new_data = nullptr;
-        if (other._size) {
-            new_data = static_cast<T*>(std::malloc(other._size * sizeof(T)));
-            if (!new_data) throw std::bad_alloc();
-            std::memcpy(new_data, other._data, other._size * sizeof(T));
-        }
-        std::free(_data);
-        _data = new_data;
-        _size = other._size;
-        _cap = other._size;
-        return *this;
-    }
-#endif
-	podVector(podVector&& o) noexcept
+	BumpArray(BumpArray&& o) noexcept
 	    : _allocator { o._allocator }
 	    , _data(o._data)
 	    , _size(o._size)
@@ -93,11 +58,8 @@ public:
 		o._cap = 0;
 	}
 
-	podVector& operator=(podVector&& o) noexcept {
+	BumpArray& operator=(BumpArray&& o) noexcept {
 		if (this != &o) {
-			if (_data) {
-				_allocator->free(_data, _cap * sizeof(T));
-			}
 			_allocator = o._allocator;
 			_data = o._data;
 			_size = o._size;
@@ -136,6 +98,9 @@ public:
 	}
 
 	T* data() noexcept {
+#ifdef _DEBUG
+		assert(_epoch == _allocator->getEpoch());
+#endif
 		return _data;
 	}
 	const T* data() const noexcept {
@@ -160,6 +125,9 @@ public:
 		assert(p);
 		_data = static_cast<T*>(p);
 		_cap = new_cap;
+#ifdef _DEBUG
+		_epoch = _allocator->getEpoch();
+#endif
 	}
 
 	void resize(size_t new_size) noexcept {
@@ -211,12 +179,12 @@ public:
 	}
 
 	void reset() {
-		if (_data) {
-			_allocator->free(_data, _cap * sizeof(T));
-			_data = nullptr;
-		}
+		_data = nullptr;
 		_size = 0;
 		_cap = 0;
+#ifdef _DEBUG
+		_epoch = 0;
+#endif
 	}
 
 	template <class _Iter>
@@ -269,13 +237,19 @@ private:
 		assert(p);
 		_data = static_cast<T*>(p);
 		_cap = new_cap;
+#ifdef _DEBUG
+		_epoch = _allocator->getEpoch();
+#endif
 	}
 
 private:
-	Allocator* _allocator;
+	LinearAllocator* _allocator;
 	T*         _data;
 	size_t     _size;
 	size_t     _cap;
+#ifdef _DEBUG
+	uint32_t _epoch = 0;
+#endif
 };
 
 } // namespace Typhoon

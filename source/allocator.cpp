@@ -40,7 +40,8 @@ BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     , parentAllocator(nullptr)
     , offset(buffer)
     , bufferSize(bufferSize)
-    , lastAlloc { nullptr } {
+    , lastAlloc { nullptr }
+    , epoch(0) {
 }
 
 BufferAllocator::BufferAllocator(Allocator& parentAllocator, size_t bufferSize)
@@ -48,7 +49,8 @@ BufferAllocator::BufferAllocator(Allocator& parentAllocator, size_t bufferSize)
     , parentAllocator(&parentAllocator)
     , offset(buffer)
     , bufferSize(bufferSize)
-    , lastAlloc { nullptr } {
+    , lastAlloc { nullptr }
+    , epoch(0) {
 }
 
 BufferAllocator::~BufferAllocator() {
@@ -87,13 +89,15 @@ void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_
 void BufferAllocator::rewind() {
 	offset = buffer;
 	lastAlloc = nullptr;
+	++epoch;
 }
 
 void BufferAllocator::rewind(void* ptr) {
 	if (ptr) {
 		assert(ptr >= buffer && ptr < static_cast<const char*>(buffer) + bufferSize);
 		offset = ptr;
-		lastAlloc = nullptr; //FIXME CHECK ptr;
+		lastAlloc = nullptr; // FIXME CHECK ptr;
+		++epoch;
 	}
 }
 
@@ -103,7 +107,8 @@ PagedAllocator::PagedAllocator(Allocator& parentAllocator, size_t pageSize, size
     , maxPages(maxPages ? maxPages : std::numeric_limits<size_t>::max())
     , rootPage(nullptr)
     , currPage(nullptr)
-    , pageCount(0) {
+    , pageCount(0)
+    , epoch(0) {
 	assert(pageSize > sizeof(Page));
 }
 
@@ -160,6 +165,7 @@ void PagedAllocator::rewind() {
 		page->offset = advancePointer(page->buffer, sizeof(Page));
 	}
 	currPage = rootPage;
+	++epoch;
 }
 
 void PagedAllocator::rewind(void* ptr) {
@@ -204,6 +210,10 @@ void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) {
 		page.offset = advancePointer(result, size);
 	}
 	return result;
+}
+
+uint32_t PagedAllocator::getEpoch() const {
+	return epoch;
 }
 
 } // namespace Typhoon

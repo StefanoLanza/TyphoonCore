@@ -92,7 +92,7 @@ class HeapAllocator final : public Allocator {
 public:
 	void* alloc(size_t size, size_t alignment) override;
 	void  free(void* ptr, size_t size) override;
-	void* realloc(void* ptr,  size_t currSize, size_t newSize, size_t alignment) override;
+	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
 };
 
 /**
@@ -102,10 +102,11 @@ class LinearAllocator : public Allocator {
 public:
 	using Allocator::alloc;
 
-	void          free(void* ptr, size_t size) override;
-	virtual void  rewind() = 0;
-	virtual void  rewind(void* ptr) = 0;
-	virtual void* getOffset() const = 0;
+	void             free(void* ptr, size_t size) override;
+	virtual void     rewind() = 0;
+	virtual void     rewind(void* ptr) = 0;
+	virtual void*    getOffset() const = 0;
+	virtual uint32_t getEpoch() const = 0;
 };
 
 /**
@@ -119,12 +120,13 @@ public:
 
 	using Allocator::alloc;
 
-	void* alloc(size_t size, size_t alignment) override;
-	void* realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void  rewind() override;
-	void  rewind(void* ptr) override;
-	void* getOffset() const override;
-	void* getBuffer() const;
+	void*    alloc(size_t size, size_t alignment) override;
+	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void     rewind() override;
+	void     rewind(void* ptr) override;
+	void*    getOffset() const override;
+	uint32_t getEpoch() const override;
+	void*    getBuffer() const;
 
 private:
 	void*      buffer;
@@ -132,19 +134,20 @@ private:
 	void*      offset;
 	size_t     bufferSize;
 	void*      lastAlloc;
+	uint32_t   epoch;
 };
 
 inline void* BufferAllocator::getOffset() const {
 	return offset;
 }
 
+inline uint32_t BufferAllocator::getEpoch() const {
+	return epoch;
+}
+
 inline void* BufferAllocator::getBuffer() const {
 	return buffer;
 }
-
-/**
- * @brief Paged allocator
- */
 
 class PagedAllocator final : public LinearAllocator {
 public:
@@ -153,11 +156,12 @@ public:
 
 	using Allocator::alloc;
 
-	void* alloc(size_t size, size_t alignment) override;
-	void* realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void  rewind() override;
-	void  rewind(void* ptr) override;
-	void* getOffset() const override;
+	void*    alloc(size_t size, size_t alignment) override;
+	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void     rewind() override;
+	void     rewind(void* ptr) override;
+	void*    getOffset() const override;
+	uint32_t getEpoch() const override;
 
 	static constexpr size_t defaultPageSize = 65536;
 
@@ -180,6 +184,7 @@ private:
 	Page*      rootPage;
 	Page*      currPage;
 	size_t     pageCount;
+	uint32_t   epoch;
 };
 
 } // namespace Typhoon

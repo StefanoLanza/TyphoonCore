@@ -3,21 +3,17 @@
 #include <core/uncopyable.h>
 #include <functional>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
-#ifndef _FINAL
-#include <string>
-#endif
 
 namespace Typhoon {
 
 class Logger;
 
 struct ResourceMetaData {
-#ifndef _FINAL
 	std::string name;
 	std::string path;
-#endif
 };
 
 /*

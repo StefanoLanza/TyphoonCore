@@ -29,6 +29,7 @@ public:
 	void                              set(EnumType bit);
 	void                              unset(EnumType bit);
 	[[nodiscard]] bool                isSet(EnumType bit) const;
+	[[nodiscard]] bool                isNotSet(EnumType bit) const;
 	constexpr Flags&                  flip(EnumType bit);
 	[[nodiscard]] constexpr bool      allOf(Flags other) const noexcept {
         return (bits & other.bits) == other.bits;
@@ -97,6 +98,11 @@ inline void Flags<EnumType>::unset(EnumType bit) {
 template <class EnumType>
 [[nodiscard]] inline bool Flags<EnumType>::isSet(EnumType bit) const {
 	return bits & static_cast<ValueType>(bit);
+}
+
+template <class EnumType>
+[[nodiscard]] inline bool Flags<EnumType>::isNotSet(EnumType bit) const {
+	return 0 == (bits & static_cast<ValueType>(bit));
 }
 
 template <class EnumType>

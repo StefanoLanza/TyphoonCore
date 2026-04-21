@@ -42,4 +42,8 @@ void ScopedAllocator::destroyAll() {
 	finalizerHead = nullptr;
 }
 
+uint32_t ScopedAllocator::getEpoch() const {
+	return allocator.getEpoch();
+}
+
 } // namespace Typhoon
