@@ -1,10 +1,11 @@
 #pragma once
 
-#include <core/uncopyable.h>
 #include <cstddef>
 #include <cstring>
 #include <type_traits>
 #include <utility>
+
+#include <core/uncopyable.h>
 
 namespace Typhoon {
 
@@ -98,7 +99,7 @@ public:
 /**
  * @brief Linear allocator
  */
-class LinearAllocator : public Allocator {
+class LinearAllocator : public Allocator, Unmoveable {
 public:
 	using Allocator::alloc;
 
@@ -112,7 +113,7 @@ public:
 /**
  * @brief Buffer allocator
  */
-class BufferAllocator final : public LinearAllocator, Uncopyable {
+class BufferAllocator final : public LinearAllocator {
 public:
 	BufferAllocator(void* buffer, size_t bufferSize);
 	BufferAllocator(Allocator& parentAllocator, size_t bufferSize);
@@ -137,21 +138,9 @@ private:
 	uint32_t   epoch;
 };
 
-inline void* BufferAllocator::getOffset() const {
-	return offset;
-}
-
-inline uint32_t BufferAllocator::getEpoch() const {
-	return epoch;
-}
-
-inline void* BufferAllocator::getBuffer() const {
-	return buffer;
-}
-
 class PagedAllocator final : public LinearAllocator {
 public:
-	PagedAllocator(Allocator& parentAllocator, size_t pageSize = defaultPageSize, size_t maxPages = 0);
+	PagedAllocator(Allocator& parentAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
 
 	using Allocator::alloc;
@@ -162,13 +151,15 @@ public:
 	void     rewind(void* ptr) override;
 	void*    getOffset() const override;
 	uint32_t getEpoch() const override;
+	size_t   getCapacity() const;
+	size_t   getAllocatedSize() const;
 
 	static constexpr size_t defaultPageSize = 65536;
 
 private:
 	struct Page;
 	Page* allocPage();
-	void* allocFromPage(Page& page, size_t size, size_t alignment);
+	void* allocFromPage(Page& page, size_t size, size_t alignment) const;
 
 private:
 	struct Page {
@@ -180,7 +171,6 @@ private:
 	};
 	Allocator* allocator;
 	size_t     pageSize;
-	size_t     maxPages;
 	Page*      rootPage;
 	Page*      currPage;
 	size_t     pageCount;

@@ -70,6 +70,9 @@ void* BufferAllocator::alloc(size_t size, size_t alignment) {
 void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
 	if (! ptr || (lastAlloc != ptr)) {
 		void* res = alloc(newSize, alignment);
+		if (! res) {
+			return nullptr;
+		}
 		if (ptr) {
 			std::memcpy(res, ptr, currSize);
 		}
@@ -99,10 +102,21 @@ void BufferAllocator::rewind(void* ptr) {
 	++epoch;
 }
 
-PagedAllocator::PagedAllocator(Allocator& parentAllocator, size_t pageSize, size_t maxPages)
+void* BufferAllocator::getOffset() const {
+	return offset;
+}
+
+uint32_t BufferAllocator::getEpoch() const {
+	return epoch;
+}
+
+void* BufferAllocator::getBuffer() const {
+	return buffer;
+}
+
+PagedAllocator::PagedAllocator(Allocator& parentAllocator, size_t pageSize)
     : allocator(&parentAllocator)
     , pageSize(pageSize)
-    , maxPages(maxPages ? maxPages : std::numeric_limits<size_t>::max())
     , rootPage(nullptr)
     , currPage(nullptr)
     , pageCount(0)
@@ -184,9 +198,6 @@ inline void* PagedAllocator::getOffset() const {
 }
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
-	if (pageCount >= maxPages) {
-		return nullptr;
-	}
 	void* buffer = allocator->alloc(pageSize, Allocator::defaultAlignment);
 	if (buffer) {
 		Page newPage;
@@ -201,7 +212,7 @@ PagedAllocator::Page* PagedAllocator::allocPage() {
 	return static_cast<Page*>(buffer);
 }
 
-void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) {
+void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) const {
 	size_t freeSize = reinterpret_cast<uintptr_t>(page.buffer) + page.size - reinterpret_cast<uintptr_t>(page.offset);
 	assert(freeSize <= page.size - sizeof(Page));
 	void* result = std::align(alignment, size, page.offset, freeSize);
@@ -213,6 +224,22 @@ void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) {
 
 uint32_t PagedAllocator::getEpoch() const {
 	return epoch;
+}
+
+size_t PagedAllocator::getCapacity() const {
+	size_t capacity = 0;
+	for (const Page* page = currPage; page; page = page->prev) {
+		capacity += pageSize - sizeof(Page);
+	}
+	return capacity;
+}
+
+size_t PagedAllocator::getAllocatedSize() const {
+	size_t size = 0;
+	for (const Page* page = currPage; page; page = page->prev) {
+		size += static_cast<const char*>(page->offset) - static_cast<const char*>(page->buffer);
+	}
+	return size;
 }
 
 } // namespace Typhoon

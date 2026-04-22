@@ -1,6 +1,7 @@
 #pragma once
 
 #include "allocator.h"
+#include <core/uncopyable.h>
 #include <type_traits>
 
 namespace Typhoon {
