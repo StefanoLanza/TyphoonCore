@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string_view>
@@ -16,8 +15,10 @@ public:
 	}
 
 	explicit SmallString(const char* str);
+	explicit SmallString(std::string_view sv);
 
-	SmallString<L>& operator=(const char*);
+	SmallString<L>& operator=(const char* str);
+	SmallString<L>& operator=(std::string_view sv);
 
 	void clear() {
 		hash = 0;
@@ -31,6 +32,10 @@ public:
 	const char* str() const {
 		return storage;
 	}
+	std::string_view sv() const {
+		return { storage, std::strlen(storage) };
+	}
+
 	uint32_t getHash() const {
 		return hash;
 	}

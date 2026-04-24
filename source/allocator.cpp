@@ -33,6 +33,7 @@ void* HeapAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t
 }
 
 void LinearAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t size) {
+	assert(false); // TODO Refactor
 }
 
 BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)

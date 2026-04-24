@@ -83,6 +83,9 @@ public:
 		if (_size == _cap) {
 			grow();
 		}
+#ifdef _DEBUG
+		debug();
+#endif
 		T* slot;
 		if constexpr (std::is_trivially_constructible_v<T>) {
 			_data[_size] = v;
@@ -113,46 +116,67 @@ public:
 		if (_size == _cap) {
 			grow();
 		}
+#ifdef _DEBUG
+		debug();
+#endif
 		T* slot = ::new (_data + _size) T(std::forward<Args>(args)...);
 		++_size;
 		return *slot;
 	}
 
 	T& operator[](size_t i) noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		return _data[i];
 	}
 	const T& operator[](size_t i) const noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		return _data[i];
 	}
 
 	T& front() noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		assert(_size);
 		return _data[0];
 	}
 	const T& front() const noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		assert(_size);
 		return _data[0];
 	}
 
 	T& back() noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
 	const T& back() const noexcept {
+#ifdef _DEBUG
+		debug();
+#endif
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
 	T* data() noexcept {
 #ifdef _DEBUG
-		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
+		debug();
 #endif
 		return _data;
 	}
 	const T* data() const noexcept {
 #ifdef _DEBUG
-		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
+		debug();
 #endif
 		return _data;
 	}
@@ -178,6 +202,9 @@ public:
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
+#ifdef _DEBUG
+		debug();
+#endif
 		if (new_size > _size) {
 			if constexpr (std::is_trivially_constructible_v<T>) {
 				// zero-init new POD elements
@@ -201,6 +228,9 @@ public:
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
+#ifdef _DEBUG
+		debug();
+#endif
 		if (new_size > _size) {
 			if constexpr (std::is_trivially_copyable_v<T>) {
 				std::fill(_data + _size, _data + new_size, value);
@@ -223,6 +253,9 @@ public:
 
 	void erase(iterator it) noexcept {
 		assert(it >= _data && it < _data + _size);
+#ifdef _DEBUG
+		debug();
+#endif
 		if constexpr (! std::is_trivially_destructible_v<T>) {
 			it->~T();
 		}
@@ -237,6 +270,9 @@ public:
 		if (count == 0) {
 			return;
 		}
+#ifdef _DEBUG
+		debug();
+#endif
 		if constexpr (! std::is_trivially_destructible_v<T>) {
 			for (iterator it = first; it != last; ++it) {
 				it->~T();
@@ -246,12 +282,7 @@ public:
 		_size -= count;
 	}
 
-	void clear() noexcept {
-		destroyAll();
-		_size = 0;
-	}
-
-	void reset() {
+	void clear() {
 		destroyAll();
 		_data = nullptr;
 		_size = 0;
@@ -328,7 +359,7 @@ private:
 			_data = static_cast<T*>(p);
 		}
 		else {
-			// Non-trivial: must allocate fresh and move � realloc is unsafe
+			// Non-trivial: must allocate fresh and move. realloc is unsafe
 			// since it may memcpy objects that own resources
 			void* raw = _allocator->alloc(new_cap * sizeof(T), alignof(T));
 			assert(raw);
@@ -346,6 +377,9 @@ private:
 #endif
 	}
 	void destroyAll() {
+#ifdef _DEBUG
+		debug();
+#endif
 		if constexpr (! std::is_trivially_destructible_v<T>) {
 			for (size_t i = 0; i < _size; ++i) {
 				_data[i].~T();
@@ -371,6 +405,12 @@ private:
 			}
 		}
 	}
+
+#ifdef _DEBUG
+	void debug() const {
+		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
+	}
+#endif
 
 private:
 	LinearAllocator* _allocator;
