@@ -10,19 +10,19 @@ namespace Typhoon {
 
 class MemoryScope : Uncopyable {
 public:
-	explicit MemoryScope(LinearAllocator& allocator);
+	explicit MemoryScope(ArenaAllocator& allocator);
 	MemoryScope();
 	~MemoryScope();
 
 private:
-	LinearAllocator& allocator;
+	ArenaAllocator& allocator;
 	void*            ptr;
 };
 
 void             setGlobalHeapAllocator(Allocator* allocator);
 Allocator&       getGlobalHeapAllocator();
-void             setGlobalScratchAllocator(LinearAllocator* allocator);
-LinearAllocator& getGlobalScratchAllocator();
+void             setGlobalScratchAllocator(ArenaAllocator* allocator);
+ArenaAllocator& getGlobalScratchAllocator();
 
 void* scratchAlloc(size_t size, size_t alignment);
 void  scratchFree(void* ptr);

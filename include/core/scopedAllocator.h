@@ -8,7 +8,7 @@ namespace Typhoon {
 
 class ScopedAllocator : Uncopyable {
 public:
-	explicit ScopedAllocator(LinearAllocator& allocator);
+	explicit ScopedAllocator(ArenaAllocator& allocator);
 	~ScopedAllocator();
 
 	template <class T, class... ArgTypes>
@@ -32,7 +32,7 @@ public:
 			ptr = allocator.constructArray<T>(elementCount);
 		}
 		if constexpr (std::is_trivially_destructible_v<T>) {
-			// Register first element only, to rewind the allocator
+			// Register first element only, to reset the allocator
 			registerObject(ptr, sizeof(T), nullptr);
 		}
 		else {
@@ -58,7 +58,7 @@ private:
 
 private:
 	struct Finalizer;
-	LinearAllocator& allocator;
+	ArenaAllocator& allocator;
 	Finalizer*       finalizerHead;
 };
 

@@ -25,13 +25,13 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	explicit ArenaVector(LinearAllocator& allocator) noexcept
+	explicit ArenaVector(ArenaAllocator& allocator) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
 	}
-	explicit ArenaVector(LinearAllocator& allocator, size_t n) noexcept
+	explicit ArenaVector(ArenaAllocator& allocator, size_t n) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
@@ -413,7 +413,7 @@ private:
 #endif
 
 private:
-	LinearAllocator* _allocator;
+	ArenaAllocator* _allocator;
 	T*               _data;
 	size_t           _size;
 	size_t           _cap;

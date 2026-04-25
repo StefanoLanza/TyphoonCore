@@ -96,24 +96,18 @@ public:
 	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
 };
 
-/**
- * @brief Linear allocator
- */
-class LinearAllocator : public Allocator, Unmoveable {
+class ArenaAllocator : public Allocator, Unmoveable {
 public:
 	using Allocator::alloc;
 
 	void             free(void* ptr, size_t size) override;
-	virtual void     rewind() = 0;
-	virtual void     rewind(void* ptr) = 0;
+	virtual void     reset() = 0;
+	virtual void     reset(void* offset) = 0;
 	virtual void*    getOffset() const = 0;
 	virtual uint32_t getEpoch() const = 0;
 };
 
-/**
- * @brief Buffer allocator
- */
-class BufferAllocator final : public LinearAllocator {
+class BufferAllocator final : public ArenaAllocator {
 public:
 	BufferAllocator(void* buffer, size_t bufferSize);
 	BufferAllocator(Allocator& parentAllocator, size_t bufferSize);
@@ -123,8 +117,8 @@ public:
 
 	void*    alloc(size_t size, size_t alignment) override;
 	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void     rewind() override;
-	void     rewind(void* ptr) override;
+	void     reset() override;
+	void     reset(void* offset) override;
 	void*    getOffset() const override;
 	uint32_t getEpoch() const override;
 	void*    getBuffer() const;
@@ -132,13 +126,13 @@ public:
 private:
 	void*      buffer;
 	Allocator* parentAllocator;
-	void*      offset;
+	void*      curr;
 	size_t     bufferSize;
 	void*      lastAlloc;
 	uint32_t   epoch;
 };
 
-class PagedAllocator final : public LinearAllocator {
+class PagedAllocator final : public ArenaAllocator {
 public:
 	PagedAllocator(Allocator& parentAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
@@ -147,8 +141,8 @@ public:
 
 	void*    alloc(size_t size, size_t alignment) override;
 	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void     rewind() override;
-	void     rewind(void* ptr) override;
+	void     reset() override;
+	void     reset(void* offset) override;
 	void*    getOffset() const override;
 	uint32_t getEpoch() const override;
 	size_t   getCapacity() const;

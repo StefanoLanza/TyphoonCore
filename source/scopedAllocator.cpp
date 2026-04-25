@@ -10,7 +10,7 @@ struct ScopedAllocator::Finalizer {
 	size_t     objSize;
 };
 
-ScopedAllocator::ScopedAllocator(LinearAllocator& allocator)
+ScopedAllocator::ScopedAllocator(ArenaAllocator& allocator)
     : allocator(allocator)
     , finalizerHead(nullptr) {
 }
@@ -39,7 +39,7 @@ void ScopedAllocator::destroyAll() {
 		last = f->obj;
 	}
 	if (last) {
-		allocator.rewind(last);
+		allocator.reset(last);
 	}
 	finalizerHead = nullptr;
 }

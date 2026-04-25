@@ -31,6 +31,10 @@ inline const void* advancePointer(const void* ptr, ptrdiff_t offset) {
 	return static_cast<const std::byte*>(ptr) + offset;
 }
 
+inline intptr_t pointerDiff(const void* a, const void* b) {
+	return static_cast<const std::byte*>(a) - static_cast<const std::byte*>(b);
+}
+
 template <typename T>
 inline T* advancePointer(T* ptr, ptrdiff_t offset) {
 	return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) + offset);

@@ -6,7 +6,7 @@ namespace Typhoon {
 namespace {
 
 Allocator*       gHeapAllocator = nullptr;
-LinearAllocator* gScratchAllocator = nullptr;
+ArenaAllocator* gScratchAllocator = nullptr;
 
 } // namespace
 
@@ -18,11 +18,11 @@ Allocator& getGlobalHeapAllocator() {
 	return *gHeapAllocator;
 }
 
-void setGlobalScratchAllocator(LinearAllocator* allocator) {
+void setGlobalScratchAllocator(ArenaAllocator* allocator) {
 	gScratchAllocator = allocator;
 }
 
-LinearAllocator& getGlobalScratchAllocator() {
+ArenaAllocator& getGlobalScratchAllocator() {
 	return *gScratchAllocator;
 }
 
@@ -34,11 +34,11 @@ void* scratchAlloc(size_t size, size_t alignment) {
 void scratchFree(void* ptr) {
 	if (ptr) {
 		assert(gScratchAllocator);
-		gScratchAllocator->rewind(ptr);
+		gScratchAllocator->reset(ptr);
 	}
 }
 
-MemoryScope::MemoryScope(LinearAllocator& allocator)
+MemoryScope::MemoryScope(ArenaAllocator& allocator)
     : allocator(allocator)
     , ptr(allocator.getOffset()) {
 }
@@ -49,7 +49,7 @@ MemoryScope::MemoryScope()
 }
 
 MemoryScope::~MemoryScope() {
-	allocator.rewind(ptr);
+	allocator.reset(ptr);
 }
 
 } // namespace Typhoon
