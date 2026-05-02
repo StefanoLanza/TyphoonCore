@@ -57,7 +57,7 @@ public:
 	void clear() requires(std::is_trivially_destructible_v<T>) {
 		BasePoolAllocator::clear();
 	}
-	void getCapacity() const {
+	size_t getCapacity() const {
 		return BasePoolAllocator::getCapacity();
 	}
 };
