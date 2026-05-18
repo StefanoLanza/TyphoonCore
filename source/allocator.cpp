@@ -8,7 +8,7 @@
 
 namespace Typhoon {
 
-void* MallocAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
+void* C_Allocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_malloc(size, alignment);
 #else
@@ -16,7 +16,7 @@ void* MallocAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #endif
 }
 
-void MallocAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
+void C_Allocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #ifdef _MSC_VER
 	::_aligned_free(ptr);
 #else
@@ -24,7 +24,7 @@ void MallocAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #endif
 }
 
-void* MallocAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
+void* C_Allocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_realloc(ptr, newSize, alignment);
 #else

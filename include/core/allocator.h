@@ -120,7 +120,7 @@ public:
 /**
  * @brief Heap allocator implementation using malloc, free and realloc
  */
-class MallocAllocator final : public HeapAllocator {
+class C_Allocator final : public HeapAllocator {
 public:
 	void* alloc(size_t size, size_t alignment) override;
 	void  free(void* ptr, size_t size);
