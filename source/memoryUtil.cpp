@@ -5,16 +5,16 @@ namespace Typhoon {
 
 namespace {
 
-Allocator*       gHeapAllocator = nullptr;
+HeapAllocator*       gHeapAllocator = nullptr;
 ArenaAllocator* gScratchAllocator = nullptr;
 
 } // namespace
 
-void setGlobalHeapAllocator(Allocator* allocator) {
+void setGlobalHeapAllocator(HeapAllocator* allocator) {
 	gHeapAllocator = allocator;
 }
 
-Allocator& getGlobalHeapAllocator() {
+HeapAllocator& getGlobalHeapAllocator() {
 	return *gHeapAllocator;
 }
 

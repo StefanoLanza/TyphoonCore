@@ -12,7 +12,7 @@ public:
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
 
-	constexpr explicit stdAllocator(Allocator& allocator) noexcept
+	constexpr explicit stdAllocator(HeapAllocator& allocator) noexcept
 	    : allocator { allocator } {
 	}
 
@@ -44,7 +44,7 @@ public:
 	friend class stdAllocator;
 
 private:
-	Allocator& allocator;
+	HeapAllocator& allocator;
 };
 
 template <typename T1, typename T2>

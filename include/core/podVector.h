@@ -26,13 +26,13 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	explicit podVector(Allocator& allocator) noexcept
+	explicit podVector(HeapAllocator& allocator) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
 	}
-	explicit podVector(Allocator& allocator, size_t n) noexcept
+	explicit podVector(HeapAllocator& allocator, size_t n) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
@@ -53,35 +53,6 @@ public:
 	podVector(const podVector&) = delete;
 	podVector& operator=(const podVector&) = delete;
 
-#if 0
-    pod_vector(const pod_vector& other) {
-        _size = other._size;
-        _cap = other._size;
-        if (_size) {
-            _data = static_cast<T*>(std::malloc(_cap * sizeof(T)));
-            if (!_data) throw std::bad_alloc();
-            std::memcpy(_data, other._data, _size * sizeof(T));
-        } else {
-            _data = nullptr;
-        }
-    }
-
-    pod_vector& operator=(const pod_vector& other) {
-        if (this == &other) return *this;
-        // Stronger strategy: allocate new block first
-        T* new_data = nullptr;
-        if (other._size) {
-            new_data = static_cast<T*>(std::malloc(other._size * sizeof(T)));
-            if (!new_data) throw std::bad_alloc();
-            std::memcpy(new_data, other._data, other._size * sizeof(T));
-        }
-        std::free(_data);
-        _data = new_data;
-        _size = other._size;
-        _cap = other._size;
-        return *this;
-    }
-#endif
 	podVector(podVector&& o) noexcept
 	    : _allocator { o._allocator }
 	    , _data(o._data)
@@ -272,10 +243,10 @@ private:
 	}
 
 private:
-	Allocator* _allocator;
-	T*         _data;
-	size_t     _size;
-	size_t     _cap;
+	HeapAllocator* _allocator;
+	T*             _data;
+	size_t         _size;
+	size_t         _cap;
 };
 
 } // namespace Typhoon

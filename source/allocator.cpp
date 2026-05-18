@@ -8,7 +8,7 @@
 
 namespace Typhoon {
 
-void* HeapAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
+void* MallocAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_malloc(size, alignment);
 #else
@@ -16,7 +16,7 @@ void* HeapAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #endif
 }
 
-void HeapAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
+void MallocAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #ifdef _MSC_VER
 	::_aligned_free(ptr);
 #else
@@ -24,16 +24,12 @@ void HeapAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #endif
 }
 
-void* HeapAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
+void* MallocAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_realloc(ptr, newSize, alignment);
 #else
 	return ::realloc(ptr, newSize);
 #endif
-}
-
-void ArenaAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t size) {
-	assert(false); // TODO Refactor
 }
 
 BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
@@ -45,7 +41,7 @@ BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     , epoch(0) {
 }
 
-BufferAllocator::BufferAllocator(Allocator& parentAllocator, size_t bufferSize)
+BufferAllocator::BufferAllocator(HeapAllocator& parentAllocator, size_t bufferSize)
     : buffer(parentAllocator.alloc(bufferSize, parentAllocator.defaultAlignment))
     , parentAllocator(&parentAllocator)
     , curr(buffer)
@@ -103,7 +99,7 @@ void BufferAllocator::reset(void* offs) {
 	if (lastAlloc != offs) {
 		lastAlloc = nullptr;
 	}
-	++epoch;
+	//++epoch;
 }
 
 void* BufferAllocator::getOffset() const {
@@ -118,7 +114,7 @@ void* BufferAllocator::getBuffer() const {
 	return buffer;
 }
 
-PagedAllocator::PagedAllocator(Allocator& parentAllocator, size_t pageSize)
+PagedAllocator::PagedAllocator(HeapAllocator& parentAllocator, size_t pageSize)
     : allocator(&parentAllocator)
     , pageSize(pageSize)
     , rootPage(nullptr)
@@ -189,7 +185,7 @@ void PagedAllocator::reset(void* offset) {
 		if (offset >= page->buffer && offset < static_cast<const char*>(page->buffer) + page->size) {
 			page->offset = offset;
 			currPage = page;
-			++epoch;
+			//++epoch;
 			return;
 		}
 	}
@@ -201,7 +197,7 @@ inline void* PagedAllocator::getOffset() const {
 }
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
-	void* buffer = allocator->alloc(pageSize, Allocator::defaultAlignment);
+	void* buffer = allocator->alloc(pageSize, BaseAllocator::defaultAlignment);
 	if (buffer) {
 		Page newPage;
 		newPage.next = nullptr;

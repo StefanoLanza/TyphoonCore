@@ -12,7 +12,7 @@ struct BasePoolAllocator::FreeSlot { // FIXME as uint32_t offset
 	FreeSlot* next;
 };
 
-BasePoolAllocator::BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment)
+BasePoolAllocator::BasePoolAllocator(HeapAllocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment)
     : backingAllocator(backingAllocator)
     , maxElements(maxElements)
     , elementSize(elementSize)

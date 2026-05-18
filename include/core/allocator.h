@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstddef>
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 #include <utility>
 
@@ -10,17 +10,13 @@
 
 namespace Typhoon {
 
-/**
- * @brief Allocator
- */
-class Allocator {
+class BaseAllocator : Unmoveable {
 public:
 	static constexpr size_t defaultAlignment = alignof(void*);
 
-	virtual ~Allocator() = default;
+	virtual ~BaseAllocator() = default;
 
 	virtual void* alloc(size_t size, size_t alignment) = 0;
-	virtual void  free(void* ptr, size_t size) = 0;
 	virtual void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) = 0;
 
 	// Helpers
@@ -67,6 +63,14 @@ public:
 		void* ptr = alloc(sizeof(T), alignof(T));
 		return ptr ? new (ptr) T { std::forward<ArgTypes>(args)... } : nullptr;
 	}
+};
+
+/**
+ * @brief Heap allocator
+ */
+class HeapAllocator : public BaseAllocator {
+public:
+	virtual void free(void* ptr, size_t size) = 0;
 
 	template <class T>
 	void destroy(T* obj) {
@@ -87,34 +91,47 @@ public:
 	}
 };
 
-/**
- * @brief Heap allocator
- */
-class HeapAllocator final : public Allocator {
+class ArenaAllocator : public BaseAllocator {
 public:
-	void* alloc(size_t size, size_t alignment) override;
-	void  free(void* ptr, size_t size) override;
-	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
-};
+	using BaseAllocator::alloc;
 
-class ArenaAllocator : public Allocator, Unmoveable {
-public:
-	using Allocator::alloc;
-
-	void             free(void* ptr, size_t size) override;
 	virtual void     reset() = 0;
 	virtual void     reset(void* offset) = 0;
 	virtual void*    getOffset() const = 0;
 	virtual uint32_t getEpoch() const = 0;
+
+	template <class T>
+	void destroy(T* obj) {
+		if (obj) {
+			obj->~T();
+		}
+	}
+
+	template <class T>
+	void destroyArray(T* objs, size_t n) {
+		if (objs) {
+			for (size_t i = 0; i < n; ++i) {
+				objs[i].~T();
+			}
+		}
+	}
+};
+
+/**
+ * @brief Heap allocator implementation using malloc, free and realloc
+ */
+class MallocAllocator final : public HeapAllocator {
+public:
+	void* alloc(size_t size, size_t alignment) override;
+	void  free(void* ptr, size_t size);
+	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
 };
 
 class BufferAllocator final : public ArenaAllocator {
 public:
 	BufferAllocator(void* buffer, size_t bufferSize);
-	BufferAllocator(Allocator& parentAllocator, size_t bufferSize);
+	BufferAllocator(HeapAllocator& parentAllocator, size_t bufferSize);
 	~BufferAllocator();
-
-	using Allocator::alloc;
 
 	void*    alloc(size_t size, size_t alignment) override;
 	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
@@ -125,20 +142,18 @@ public:
 	void*    getBuffer() const;
 
 private:
-	void*      buffer;
-	Allocator* parentAllocator;
-	void*      curr;
-	size_t     bufferSize;
-	void*      lastAlloc;
-	uint32_t   epoch;
+	void*          buffer;
+	HeapAllocator* parentAllocator;
+	void*          curr;
+	size_t         bufferSize;
+	void*          lastAlloc;
+	uint32_t       epoch;
 };
 
 class PagedAllocator final : public ArenaAllocator {
 public:
-	PagedAllocator(Allocator& parentAllocator, size_t pageSize = defaultPageSize);
+	PagedAllocator(HeapAllocator& parentAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
-
-	using Allocator::alloc;
 
 	void*    alloc(size_t size, size_t alignment) override;
 	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
@@ -164,12 +179,12 @@ private:
 		void*  offset;
 		size_t size;
 	};
-	Allocator* allocator;
-	size_t     pageSize;
-	Page*      rootPage;
-	Page*      currPage;
-	size_t     pageCount;
-	uint32_t   epoch;
+	HeapAllocator* allocator;
+	size_t         pageSize;
+	Page*          rootPage;
+	Page*          currPage;
+	size_t         pageCount;
+	uint32_t       epoch;
 };
 
 } // namespace Typhoon

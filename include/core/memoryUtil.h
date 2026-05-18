@@ -16,12 +16,12 @@ public:
 
 private:
 	ArenaAllocator& allocator;
-	void*            ptr;
+	void*           ptr;
 };
 
-void             setGlobalHeapAllocator(Allocator* allocator);
-Allocator&       getGlobalHeapAllocator();
-void             setGlobalScratchAllocator(ArenaAllocator* allocator);
+void            setGlobalHeapAllocator(HeapAllocator* allocator);
+HeapAllocator&  getGlobalHeapAllocator();
+void            setGlobalScratchAllocator(ArenaAllocator* allocator);
 ArenaAllocator& getGlobalScratchAllocator();
 
 void* scratchAlloc(size_t size, size_t alignment);
