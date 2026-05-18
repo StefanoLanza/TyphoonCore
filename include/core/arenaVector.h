@@ -62,6 +62,7 @@ public:
 
 	ArenaVector& operator=(ArenaVector&& o) noexcept {
 		if (this != &o) {
+			assert(_allocator == o._allocator && "Move-assigning between vectors with different allocators");
 			destroyAll();
 			_data = o._data;
 			_size = o._size;
@@ -78,22 +79,7 @@ public:
 	}
 
 	T& push_back(const T& v) {
-		if (_size == _cap) {
-			grow();
-		}
-#ifdef _DEBUG
-		debug();
-#endif
-		T* slot;
-		if constexpr (std::is_trivially_constructible_v<T>) {
-			_data[_size] = v;
-			slot = &_data[_size];
-		}
-		else {
-			slot = ::new (_data + _size) T(v);
-		}
-		++_size;
-		return *slot;
+		return emplace_back(v);
 	}
 
 	T& push_back(T&& v) noexcept {
@@ -101,12 +87,11 @@ public:
 	}
 
 	void pop_back() noexcept {
-		if (_size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy_at(_data + _size - 1);
-			}
-			--_size;
+		assert(_size > 0);
+		if constexpr (! std::is_trivially_destructible_v<T>) {
+			std::destroy_at(_data + _size - 1);
 		}
+		--_size;
 	}
 
 	template <typename... Args>
@@ -204,7 +189,7 @@ public:
 		debug();
 #endif
 		if (new_size > _size) {
-			if constexpr (std::is_trivially_constructible_v<T>) {
+			if constexpr (std::is_trivially_default_constructible_v<T>) {
 				// zero-init new POD elements
 				std::memset(_data + _size, 0, (new_size - _size) * sizeof(T));
 			}
@@ -213,9 +198,7 @@ public:
 			}
 		}
 		else if (new_size < _size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy(_data + new_size, _data + _size);
-			}
+			std::destroy(_data + new_size, _data + _size);
 		}
 		_size = new_size;
 	}
@@ -231,23 +214,13 @@ public:
 			std::uninitialized_fill(_data + _size, _data + new_size, value);
 		}
 		else if (new_size < _size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy(_data + new_size, _data + _size);
-			}
+			std::destroy(_data + new_size, _data + _size);
 		}
 		_size = new_size;
 	}
 
 	void erase(iterator it) noexcept {
-		assert(it >= _data && it < _data + _size);
-#ifdef _DEBUG
-		debug();
-#endif
-		shiftLeft(it + 1, _data + _size, it);
-		if constexpr (!std::is_trivially_destructible_v<T>) {
-			std::destroy_at(_data + (_size - 1));
-		}
-		_size--;
+		erase(it, it + 1);
 	}
 
 	// erase range [first, last)
@@ -260,10 +233,28 @@ public:
 #ifdef _DEBUG
 		debug();
 #endif
-		shiftLeft(last, _data + _size, first);
-		if constexpr (!std::is_trivially_destructible_v<T>) {
-			std::destroy(_data + (_size - count), _data + _size);
+
+		iterator dst = first;
+		iterator src = last;
+		iterator end_it = _data + _size;
+
+		if constexpr (std::is_trivially_copyable_v<T>) {
+			std::memmove(dst, src, static_cast<size_t>(end_it - src) * sizeof(T));
 		}
+		else {
+			for (; src != end_it; ++dst, ++src) {
+				if constexpr (std::is_move_assignable_v<T>) {
+					*dst = std::move(*src);
+				} else if constexpr (std::is_copy_assignable_v<T>) {
+					*dst = *src;
+				} else {
+					std::destroy_at(dst);
+					::new (dst) T(std::move(*src));
+				}
+			}
+			std::destroy(end_it - count, end_it);
+		}
+
 		_size -= count;
 	}
 
@@ -280,8 +271,8 @@ public:
 	template <class _Iter>
 	void assign(_Iter first, _Iter last) {
 		assert(last >= first);
-		const size_t newSize = std::distance(first, last);
 		destroyAll();
+		const size_t newSize = static_cast<size_t>(std::distance(first, last));
 		if (newSize > _cap) {
 			reserve(grow_to(newSize));
 		}
@@ -350,30 +341,7 @@ private:
 #ifdef _DEBUG
 		debug();
 #endif
-		if constexpr (! std::is_trivially_destructible_v<T>) {
-			std::destroy(_data, _data + _size);
-		}
-	}
-
-	// Move [src_first, src_last) to [dst, ...), handles overlapping ranges
-	void shiftLeft(iterator src_first, iterator src_last, iterator dst) noexcept {
-		if constexpr (std::is_trivially_copyable_v<T>) {
-			std::memmove(dst, src_first, static_cast<size_t>(src_last - src_first) * sizeof(T));
-		}
-		else {
-			while (src_first != src_last) {
-				// Move-assign if possible, otherwise copy-assign
-				if constexpr (std::is_nothrow_move_assignable_v<T>) {
-					*dst = std::move(*src_first);
-					std::destroy_at(src_first);
-				}
-				else {
-					*dst = *src_first;
-				}
-				++dst;
-				++src_first;
-			}
-		}
+		std::destroy(_data, _data + _size);
 	}
 
 #ifdef _DEBUG
