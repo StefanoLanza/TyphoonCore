@@ -34,16 +34,16 @@ void* C_Allocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t n
 
 BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     : buffer(buffer)
-    , parentAllocator(nullptr)
+    , backingAllocator(nullptr)
     , curr(buffer)
     , bufferSize(bufferSize)
     , lastAlloc { nullptr }
     , epoch(0) {
 }
 
-BufferAllocator::BufferAllocator(HeapAllocator& parentAllocator, size_t bufferSize)
-    : buffer(parentAllocator.alloc(bufferSize, parentAllocator.defaultAlignment))
-    , parentAllocator(&parentAllocator)
+BufferAllocator::BufferAllocator(HeapAllocator& backingAllocator, size_t bufferSize)
+    : buffer(backingAllocator.alloc(bufferSize, backingAllocator.defaultAlignment))
+    , backingAllocator(&backingAllocator)
     , curr(buffer)
     , bufferSize(bufferSize)
     , lastAlloc { nullptr }
@@ -51,7 +51,7 @@ BufferAllocator::BufferAllocator(HeapAllocator& parentAllocator, size_t bufferSi
 }
 
 BufferAllocator::~BufferAllocator() {
-	parentAllocator->free(buffer, bufferSize);
+	backingAllocator->free(buffer, bufferSize);
 }
 
 void* BufferAllocator::alloc(size_t size, size_t alignment) {
@@ -65,7 +65,16 @@ void* BufferAllocator::alloc(size_t size, size_t alignment) {
 }
 
 void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
-	if (! ptr || (lastAlloc != ptr)) {
+	if (ptr && lastAlloc == ptr) {
+		// Extend last allocation
+		assert(isAligned(ptr, alignment));
+		if (reinterpret_cast<uintptr_t>(ptr) + newSize > reinterpret_cast<uintptr_t>(buffer) + bufferSize) {
+			return nullptr; // out of memory
+		}
+		curr = advancePointer(ptr, newSize);
+		return ptr;
+	}
+	else {
 		void* res = alloc(newSize, alignment);
 		if (! res) {
 			return nullptr;
@@ -74,15 +83,6 @@ void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_
 			std::memcpy(res, ptr, currSize);
 		}
 		return res;
-	}
-	else {
-		// Extend last allocation
-		if (reinterpret_cast<uintptr_t>(ptr) + newSize > reinterpret_cast<uintptr_t>(buffer) + bufferSize) {
-			return nullptr; // out of memory
-		}
-		assert(isAligned(ptr, alignment));
-		curr = advancePointer(ptr, newSize);
-		return ptr;
 	}
 }
 
@@ -114,10 +114,9 @@ void* BufferAllocator::getBuffer() const {
 	return buffer;
 }
 
-PagedAllocator::PagedAllocator(HeapAllocator& parentAllocator, size_t pageSize)
-    : allocator(&parentAllocator)
+PagedAllocator::PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize)
+    : allocator(&backingAllocator)
     , pageSize(pageSize)
-    , rootPage(nullptr)
     , currPage(nullptr)
     , pageCount(0)
     , epoch(0) {
@@ -125,10 +124,10 @@ PagedAllocator::PagedAllocator(HeapAllocator& parentAllocator, size_t pageSize)
 }
 
 PagedAllocator::~PagedAllocator() {
-	for (Page* page = rootPage; page;) {
-		Page* next = page->next; // Fetch before freeing page
+	for (Page* page = currPage; page;) {
+		Page* prev = page->prev; // Fetch before freeing page
 		allocator->free(page->buffer, pageSize);
-		page = next;
+		page = prev;
 	}
 }
 
@@ -136,16 +135,8 @@ void* PagedAllocator::alloc(size_t size, size_t alignment) {
 	if (size > pageSize - sizeof(Page)) {
 		return nullptr;
 	}
-	if (! rootPage) {
-		rootPage = allocPage();
-		if (! rootPage) {
-			return nullptr;
-		}
-		currPage = rootPage;
-	}
 
-	for (Page* page = currPage; page != nullptr; page = page->next) {
-		currPage = page;
+	for (Page* page = currPage; page != nullptr; page = page->prev) {
 		if (void* result = allocFromPage(*page, size, alignment); result) {
 			return result;
 		}
@@ -154,7 +145,6 @@ void* PagedAllocator::alloc(size_t size, size_t alignment) {
 	Page* newPage = allocPage();
 	if (newPage) {
 		newPage->prev = currPage;
-		currPage->next = newPage;
 		currPage = newPage;
 		if (void* result = allocFromPage(*newPage, size, alignment); result) {
 			return result;
@@ -164,17 +154,33 @@ void* PagedAllocator::alloc(size_t size, size_t alignment) {
 }
 
 void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
-	// TODO Improve
+	for (Page* page = currPage; page != nullptr; page = page->prev) {
+		if (ptr && page->lastAllocation == ptr) {
+			assert(isAligned(ptr, alignment));
+			size_t freeSize = reinterpret_cast<uintptr_t>(page->buffer) + page->size - reinterpret_cast<uintptr_t>(ptr);
+			if (freeSize >= newSize) {
+				page->offset = advancePointer(ptr, newSize);
+				return ptr;
+			}
+		}
+	}
+
+	// in-place realloc failed
+
 	void* res = alloc(newSize, alignment);
 	if (ptr) {
 		std::memcpy(res, ptr, currSize);
 	}
+
 	return res;
 }
 
 void PagedAllocator::reset() {
+	Page* rootPage = nullptr;
 	for (Page* page = currPage; page; page = page->prev) {
 		page->offset = advancePointer(page->buffer, sizeof(Page));
+		page->lastAllocation = nullptr;
+		rootPage = page;
 	}
 	currPage = rootPage;
 	++epoch;
@@ -197,14 +203,15 @@ inline void* PagedAllocator::getOffset() const {
 }
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
-	void* buffer = allocator->alloc(pageSize, BaseAllocator::defaultAlignment);
+	void* buffer = allocator->alloc(pageSize, Allocator::defaultAlignment);
 	if (buffer) {
-		Page newPage;
-		newPage.next = nullptr;
-		newPage.prev = nullptr;
-		newPage.buffer = buffer;
-		newPage.offset = advancePointer(buffer, sizeof(Page));
-		newPage.size = pageSize - sizeof(Page);
+		const Page newPage {
+			.prev = nullptr,
+			.buffer = buffer,
+			.offset = advancePointer(buffer, sizeof(Page)),
+			.lastAllocation = nullptr,
+			.size = pageSize - sizeof(Page),
+		};
 		std::memcpy(buffer, &newPage, sizeof newPage);
 		++pageCount;
 	}
@@ -216,6 +223,7 @@ void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) c
 	assert(freeSize <= page.size - sizeof(Page));
 	void* result = std::align(alignment, size, page.offset, freeSize);
 	if (result) {
+		page.lastAllocation = result;
 		page.offset = advancePointer(result, size);
 	}
 	return result;

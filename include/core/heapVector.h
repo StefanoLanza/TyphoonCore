@@ -205,8 +205,14 @@ public:
 		}
 		else {
 			for (; src != end_it; ++dst, ++src) {
-				std::destroy_at(dst);
-				::new (dst) T(std::move(*src));
+				if constexpr (std::is_move_assignable_v<T>) {
+					*dst = std::move(*src);
+				} else if constexpr (std::is_copy_assignable_v<T>) {
+					*dst = *src;
+				} else {
+					std::destroy_at(dst);
+					::new (dst) T(std::move(*src));
+				}
 			}
 			std::destroy(end_it - count, end_it);
 		}

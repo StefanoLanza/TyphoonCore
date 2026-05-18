@@ -10,11 +10,11 @@
 
 namespace Typhoon {
 
-class BaseAllocator : Unmoveable {
+class Allocator : Unmoveable {
 public:
 	static constexpr size_t defaultAlignment = alignof(void*);
 
-	virtual ~BaseAllocator() = default;
+	virtual ~Allocator() = default;
 
 	virtual void* alloc(size_t size, size_t alignment) = 0;
 	virtual void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) = 0;
@@ -68,7 +68,7 @@ public:
 /**
  * @brief Heap allocator
  */
-class HeapAllocator : public BaseAllocator {
+class HeapAllocator : public Allocator {
 public:
 	virtual void free(void* ptr, size_t size) = 0;
 
@@ -91,9 +91,9 @@ public:
 	}
 };
 
-class ArenaAllocator : public BaseAllocator {
+class ArenaAllocator : public Allocator {
 public:
-	using BaseAllocator::alloc;
+	using Allocator::alloc;
 
 	virtual void     reset() = 0;
 	virtual void     reset(void* offset) = 0;
@@ -123,14 +123,14 @@ public:
 class C_Allocator final : public HeapAllocator {
 public:
 	void* alloc(size_t size, size_t alignment) override;
-	void  free(void* ptr, size_t size);
+	void  free(void* ptr, size_t size) override;
 	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
 };
 
 class BufferAllocator final : public ArenaAllocator {
 public:
 	BufferAllocator(void* buffer, size_t bufferSize);
-	BufferAllocator(HeapAllocator& parentAllocator, size_t bufferSize);
+	BufferAllocator(HeapAllocator& backingAllocator, size_t bufferSize);
 	~BufferAllocator();
 
 	void*    alloc(size_t size, size_t alignment) override;
@@ -143,7 +143,7 @@ public:
 
 private:
 	void*          buffer;
-	HeapAllocator* parentAllocator;
+	HeapAllocator* backingAllocator;
 	void*          curr;
 	size_t         bufferSize;
 	void*          lastAlloc;
@@ -152,7 +152,7 @@ private:
 
 class PagedAllocator final : public ArenaAllocator {
 public:
-	PagedAllocator(HeapAllocator& parentAllocator, size_t pageSize = defaultPageSize);
+	PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
 
 	void*    alloc(size_t size, size_t alignment) override;
@@ -173,15 +173,14 @@ private:
 
 private:
 	struct Page {
-		Page*  next;
 		Page*  prev;
 		void*  buffer;
 		void*  offset;
+		void*  lastAllocation;
 		size_t size;
 	};
 	HeapAllocator* allocator;
 	size_t         pageSize;
-	Page*          rootPage;
 	Page*          currPage;
 	size_t         pageCount;
 	uint32_t       epoch;
