@@ -13,11 +13,11 @@ namespace Typhoon {
 
 template <typename T>
 #ifdef __cpp_lib_concepts
-requires(std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>)
+requires((std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>))
 #endif
 
-    class ArenaVector {
-	static_assert(std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>, "ArenaVector requires T to be move- or copy-constructible");
+    class HeapVector {
+	static_assert(std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>, "HeapVector requires move or copy constructible types");
 
 public:
 	using value_type = T;
@@ -25,32 +25,25 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	explicit ArenaVector(ArenaAllocator& allocator) noexcept
+	explicit HeapVector(HeapAllocator& allocator) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
 	}
-	explicit ArenaVector(ArenaAllocator& allocator, size_t n) noexcept
+	explicit HeapVector(HeapAllocator& allocator, size_t n) noexcept
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
-		reserve(n);
-		if constexpr (std::is_trivially_constructible_v<T>) {
-			std::memset(_data, 0, n * sizeof(T));
-		}
-		else {
-			std::uninitialized_default_construct(_data, _data + n);
-		}
-		_size = n;
+		resize(n);
 	}
 
 	// not copyable
-	ArenaVector(const ArenaVector&) = delete;
-	ArenaVector& operator=(const ArenaVector&) = delete;
+	HeapVector(const HeapVector&) = delete;
+	HeapVector& operator=(const HeapVector&) = delete;
 
-	ArenaVector(ArenaVector&& o) noexcept
+	HeapVector(HeapVector&& o) noexcept
 	    : _allocator { o._allocator }
 	    , _data(o._data)
 	    , _size(o._size)
@@ -60,9 +53,11 @@ public:
 		o._cap = 0;
 	}
 
-	ArenaVector& operator=(ArenaVector&& o) noexcept {
+	HeapVector& operator=(HeapVector&& o) noexcept {
 		if (this != &o) {
-			destroyAll();
+			assert(_allocator == o._allocator && "Move-assigning between vectors with different allocators");
+			clear();
+			freeStorage();
 			_data = o._data;
 			_size = o._size;
 			_cap = o._cap;
@@ -73,27 +68,13 @@ public:
 		return *this;
 	}
 
-	~ArenaVector() {
-		destroyAll();
+	~HeapVector() {
+		clear();
+		freeStorage();
 	}
 
 	T& push_back(const T& v) {
-		if (_size == _cap) {
-			grow();
-		}
-#ifdef _DEBUG
-		debug();
-#endif
-		T* slot;
-		if constexpr (std::is_trivially_constructible_v<T>) {
-			_data[_size] = v;
-			slot = &_data[_size];
-		}
-		else {
-			slot = ::new (_data + _size) T(v);
-		}
-		++_size;
-		return *slot;
+		return emplace_back(v);
 	}
 
 	T& push_back(T&& v) noexcept {
@@ -101,81 +82,55 @@ public:
 	}
 
 	void pop_back() noexcept {
-		if (_size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy_at(_data + _size - 1);
-			}
-			--_size;
+		assert(_size > 0);
+		if constexpr (! std::is_trivially_destructible_v<T>) {
+			std::destroy_at(_data + _size - 1);
 		}
+		--_size;
 	}
 
 	template <typename... Args>
-	T& emplace_back(Args&&... args) noexcept {
+	T& emplace_back(Args&&... args) {
 		if (_size == _cap) {
-			grow();
+			reallocate(grow_to(_size + 1));
 		}
-#ifdef _DEBUG
-		debug();
-#endif
 		T* slot = ::new (_data + _size) T(std::forward<Args>(args)...);
 		++_size;
 		return *slot;
 	}
 
 	T& operator[](size_t i) noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
+		assert(i < _size);
 		return _data[i];
 	}
 	const T& operator[](size_t i) const noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
+		assert(i < _size);
 		return _data[i];
 	}
 
 	T& front() noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
-		assert(_size);
+		assert(_size > 0);
 		return _data[0];
 	}
 	const T& front() const noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
-		assert(_size);
+		assert(_size > 0);
 		return _data[0];
 	}
 
 	T& back() noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
 	const T& back() const noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
 	T* data() noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
 		return _data;
 	}
 	const T* data() const noexcept {
-#ifdef _DEBUG
-		debug();
-#endif
 		return _data;
 	}
 	size_t size() const noexcept {
@@ -200,11 +155,8 @@ public:
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
-#ifdef _DEBUG
-		debug();
-#endif
 		if (new_size > _size) {
-			if constexpr (std::is_trivially_constructible_v<T>) {
+			if constexpr (std::is_trivially_default_constructible_v<T>) {
 				// zero-init new POD elements
 				std::memset(_data + _size, 0, (new_size - _size) * sizeof(T));
 			}
@@ -213,9 +165,7 @@ public:
 			}
 		}
 		else if (new_size < _size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy(_data + new_size, _data + _size);
-			}
+			std::destroy(_data + new_size, _data + _size);
 		}
 		_size = new_size;
 	}
@@ -224,64 +174,56 @@ public:
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
-#ifdef _DEBUG
-		debug();
-#endif
 		if (new_size > _size) {
 			std::uninitialized_fill(_data + _size, _data + new_size, value);
 		}
 		else if (new_size < _size) {
-			if constexpr (! std::is_trivially_destructible_v<T>) {
-				std::destroy(_data + new_size, _data + _size);
-			}
+			std::destroy(_data + new_size, _data + _size);
 		}
 		_size = new_size;
 	}
 
 	void erase(iterator it) noexcept {
-		assert(it >= _data && it < _data + _size);
-#ifdef _DEBUG
-		debug();
-#endif
-		shiftLeft(it + 1, _data + _size, it);
-		if constexpr (!std::is_trivially_destructible_v<T>) {
-			std::destroy_at(_data + (_size - 1));
-		}
-		_size--;
+		erase(it, it + 1);
 	}
 
 	// erase range [first, last)
 	void erase(iterator first, iterator last) noexcept {
 		assert(first <= last && first >= _data && last <= _data + _size);
+
 		const size_t count = static_cast<size_t>(last - first);
 		if (count == 0) {
 			return;
 		}
-#ifdef _DEBUG
-		debug();
-#endif
-		shiftLeft(last, _data + _size, first);
-		if constexpr (!std::is_trivially_destructible_v<T>) {
-			std::destroy(_data + (_size - count), _data + _size);
+
+		iterator dst = first;
+		iterator src = last;
+		iterator end_it = _data + _size;
+
+		if constexpr (std::is_trivially_copyable_v<T>) {
+			std::memmove(dst, src, static_cast<size_t>(end_it - src) * sizeof(T));
 		}
+		else {
+			for (; src != end_it; ++dst, ++src) {
+				std::destroy_at(dst);
+				::new (dst) T(std::move(*src));
+			}
+			std::destroy(end_it - count, end_it);
+		}
+
 		_size -= count;
 	}
 
 	void clear() {
-		destroyAll();
-		_data = nullptr;
+		std::destroy(_data, _data + _size);
 		_size = 0;
-		_cap = 0;
-#ifdef _DEBUG
-		_epoch = 0;
-#endif
 	}
 
 	template <class _Iter>
 	void assign(_Iter first, _Iter last) {
 		assert(last >= first);
-		const size_t newSize = std::distance(first, last);
-		destroyAll();
+		clear();
+		const size_t newSize = static_cast<size_t>(std::distance(first, last));
 		if (newSize > _cap) {
 			reserve(grow_to(newSize));
 		}
@@ -310,6 +252,13 @@ public:
 	}
 
 private:
+	void freeStorage() {
+		if (_data) {
+			_allocator->free(_data, _cap * sizeof(T));
+			_data = nullptr;
+			_cap = 0;
+		}
+	}
 
 	size_t grow_to(size_t min_needed) const {
 		size_t n = (_cap ? _cap * 2 : 1);
@@ -317,10 +266,6 @@ private:
 			n *= 2;
 		}
 		return n;
-	}
-
-	void grow() {
-		reallocate(grow_to(_size + 1));
 	}
 
 	void reallocate(size_t new_cap) {
@@ -336,60 +281,19 @@ private:
 			assert(raw);
 			T* new_data = static_cast<T*>(raw);
 			std::uninitialized_move_n(_data, _size, new_data);
-			destroyAll();
-			_data = new_data; // old block returns to arena on arena reset
+			std::destroy(_data, _data + _size);
+			freeStorage();
+			_data = new_data;
 		}
 
 		_cap = new_cap;
-#ifdef _DEBUG
-		_epoch = _allocator->getEpoch();
-#endif
 	}
-	
-	void destroyAll() {
-#ifdef _DEBUG
-		debug();
-#endif
-		if constexpr (! std::is_trivially_destructible_v<T>) {
-			std::destroy(_data, _data + _size);
-		}
-	}
-
-	// Move [src_first, src_last) to [dst, ...), handles overlapping ranges
-	void shiftLeft(iterator src_first, iterator src_last, iterator dst) noexcept {
-		if constexpr (std::is_trivially_copyable_v<T>) {
-			std::memmove(dst, src_first, static_cast<size_t>(src_last - src_first) * sizeof(T));
-		}
-		else {
-			while (src_first != src_last) {
-				// Move-assign if possible, otherwise copy-assign
-				if constexpr (std::is_nothrow_move_assignable_v<T>) {
-					*dst = std::move(*src_first);
-					std::destroy_at(src_first);
-				}
-				else {
-					*dst = *src_first;
-				}
-				++dst;
-				++src_first;
-			}
-		}
-	}
-
-#ifdef _DEBUG
-	void debug() const {
-		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
-	}
-#endif
 
 private:
-	ArenaAllocator* _allocator;
-	T*               _data;
-	size_t           _size;
-	size_t           _cap;
-#ifdef _DEBUG
-	uint32_t _epoch = 0;
-#endif
+	HeapAllocator* _allocator;
+	T*             _data;
+	size_t         _size;
+	size_t         _cap;
 };
 
 } // namespace Typhoon
