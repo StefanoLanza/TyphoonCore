@@ -117,6 +117,7 @@ PagedAllocator::PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize)
     , pageSize(pageSize)
     , rootPage(nullptr)
     , currPage(nullptr)
+    , lastAllocation(nullptr)
     , epoch(0) {
 	assert(pageSize > sizeof(Page));
 }
@@ -131,50 +132,41 @@ PagedAllocator::~PagedAllocator() {
 
 void* PagedAllocator::alloc(size_t size, size_t alignment) {
 	if (size > pageSize - sizeof(Page)) {
-		return nullptr;
+		return nullptr; // can never be satisfied
 	}
 
-#if 0
-	for (Page* page = currPage; page != nullptr; page = page->prev) {
-		if (void* result = allocFromPage(*page, size, alignment); result) {
-			return result;
-		}
-	}
-#else
 	for (Page* page = currPage; page != nullptr; page = page->next) {
 		currPage = page;
 		if (void* result = allocFromPage(*currPage, size, alignment); result) {
+			lastAllocation = result;
 			return result;
 		}
 	}
-#endif
 
 	Page* newPage = allocPage();
 	if (! rootPage) {
 		rootPage = newPage;
 	}
-	if (newPage) {
-		newPage->prev = currPage;
-		if (currPage) {
-			currPage->next = newPage;
-		}
-		currPage = newPage;
-		if (void* result = allocFromPage(*newPage, size, alignment); result) {
-			return result;
-		}
+	newPage->prev = currPage;
+	if (currPage) {
+		currPage->next = newPage;
 	}
-	return nullptr;
+	currPage = newPage;
+	void* result = allocFromPage(*newPage, size, alignment);
+	if (result) {
+		lastAllocation = result;
+	}
+	return result;
 }
 
 void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
-	for (Page* page = currPage; page != nullptr; page = page->prev) {
-		if (ptr && page->lastAllocation == ptr) {
-			assert(isAligned(ptr, alignment));
-			size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(page->buffer, ptr);
-			if (freeSize >= newSize) {
-				page->offset = advancePointer(ptr, newSize);
-				return ptr;
-			}
+	if (ptr && lastAllocation == ptr) {
+		assert(currPage);
+		assert(isAligned(ptr, alignment));
+		size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(currPage->buffer, ptr);
+		if (freeSize >= newSize) {
+			currPage->offset = advancePointer(ptr, newSize);
+			return ptr;
 		}
 	}
 
@@ -191,14 +183,15 @@ void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t
 void PagedAllocator::reset() {
 	for (Page* page = rootPage; page; page = page->next) {
 		page->offset = page->buffer;
-		page->lastAllocation = nullptr;
 	}
 	currPage = rootPage;
+	lastAllocation = nullptr;
 	++epoch;
 }
 
 void PagedAllocator::reset(void* offset) {
 	// Note: do not free pages after the one containing offset
+	lastAllocation = nullptr;
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
 		if (isPointerInRange(offset, page->buffer, pageSize - sizeof(Page))) {
 			page->offset = offset;
@@ -216,18 +209,17 @@ inline void* PagedAllocator::getOffset() const {
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
 	// Single allocation for both page and buffer
-	void* page = allocator->alloc(pageSize, Allocator::defaultAlignment);
-	if (page) {
-		void*      buffer = advancePointer(page, sizeof(Page));
-		const Page newPage {
-			.prev = nullptr,
-			.buffer = buffer,
-			.offset = buffer,
-			.lastAllocation = nullptr,
-		};
-		std::memcpy(page, &newPage, sizeof newPage);
-	}
-	return static_cast<Page*>(page);
+	void* mem = allocator->alloc(pageSize, Allocator::defaultAlignment);
+	assert(mem);
+	void*      buffer = advancePointer(mem, sizeof(Page));
+	const Page newPage {
+		.prev = nullptr,
+		.next = nullptr,
+		.buffer = buffer,
+		.offset = buffer,
+	};
+	std::memcpy(mem, &newPage, sizeof newPage);
+	return static_cast<Page*>(mem);
 }
 
 void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) const {
@@ -235,7 +227,6 @@ void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) c
 	assert(freeSize <= pageSize - sizeof(Page));
 	void* result = std::align(alignment, size, page.offset, freeSize);
 	if (result) {
-		page.lastAllocation = result;
 		page.offset = advancePointer(result, size);
 	}
 	return result;

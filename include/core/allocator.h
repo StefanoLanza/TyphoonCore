@@ -172,7 +172,6 @@ private:
 		Page* next;
 		void* buffer;
 		void* offset;
-		void* lastAllocation;
 	};
 
 	Page* allocPage();
@@ -183,6 +182,7 @@ private:
 	size_t         pageSize;
 	Page*          rootPage;
 	Page*          currPage;
+	void*          lastAllocation;
 	uint32_t       epoch;
 };
 
