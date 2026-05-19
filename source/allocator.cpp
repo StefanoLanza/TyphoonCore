@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <limits>
 #include <memory>
 
 namespace Typhoon {
@@ -55,7 +54,7 @@ BufferAllocator::~BufferAllocator() {
 }
 
 void* BufferAllocator::alloc(size_t size, size_t alignment) {
-	size_t freeSize = reinterpret_cast<uintptr_t>(buffer) + bufferSize - reinterpret_cast<uintptr_t>(curr);
+	size_t freeSize = pointerDiffU(buffer, curr) + bufferSize;
 	void*  result = std::align(alignment, size, curr, freeSize);
 	if (result) {
 		curr = advancePointer(result, size);
@@ -93,8 +92,7 @@ void BufferAllocator::reset() {
 }
 
 void BufferAllocator::reset(void* offs) {
-	assert(static_cast<const std::byte*>(offs) >= static_cast<const std::byte*>(buffer) &&
-	       static_cast<const std::byte*>(offs) < static_cast<const std::byte*>(buffer) + bufferSize);
+	assert(isPointerInRange(offs, buffer, curr));
 	curr = offs;
 	if (lastAlloc != offs) {
 		lastAlloc = nullptr;
@@ -117,17 +115,17 @@ void* BufferAllocator::getBuffer() const {
 PagedAllocator::PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize)
     : allocator(&backingAllocator)
     , pageSize(pageSize)
+    , rootPage(nullptr)
     , currPage(nullptr)
-    , pageCount(0)
     , epoch(0) {
 	assert(pageSize > sizeof(Page));
 }
 
 PagedAllocator::~PagedAllocator() {
-	for (Page* page = currPage; page;) {
-		Page* prev = page->prev; // Fetch before freeing page
-		allocator->free(page->buffer, pageSize);
-		page = prev;
+	for (Page* page = rootPage; page;) {
+		Page* next = page->next; // fetch before freeing page
+		allocator->free(page, pageSize);
+		page = next;
 	}
 }
 
@@ -136,15 +134,30 @@ void* PagedAllocator::alloc(size_t size, size_t alignment) {
 		return nullptr;
 	}
 
+#if 0
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
 		if (void* result = allocFromPage(*page, size, alignment); result) {
 			return result;
 		}
 	}
+#else
+	for (Page* page = currPage; page != nullptr; page = page->next) {
+		currPage = page;
+		if (void* result = allocFromPage(*currPage, size, alignment); result) {
+			return result;
+		}
+	}
+#endif
 
 	Page* newPage = allocPage();
+	if (! rootPage) {
+		rootPage = newPage;
+	}
 	if (newPage) {
 		newPage->prev = currPage;
+		if (currPage) {
+			currPage->next = newPage;
+		}
 		currPage = newPage;
 		if (void* result = allocFromPage(*newPage, size, alignment); result) {
 			return result;
@@ -157,7 +170,7 @@ void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
 		if (ptr && page->lastAllocation == ptr) {
 			assert(isAligned(ptr, alignment));
-			size_t freeSize = reinterpret_cast<uintptr_t>(page->buffer) + page->size - reinterpret_cast<uintptr_t>(ptr);
+			size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(page->buffer, ptr);
 			if (freeSize >= newSize) {
 				page->offset = advancePointer(ptr, newSize);
 				return ptr;
@@ -176,19 +189,18 @@ void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t
 }
 
 void PagedAllocator::reset() {
-	Page* rootPage = nullptr;
-	for (Page* page = currPage; page; page = page->prev) {
-		page->offset = advancePointer(page->buffer, sizeof(Page));
+	for (Page* page = rootPage; page; page = page->next) {
+		page->offset = page->buffer;
 		page->lastAllocation = nullptr;
-		rootPage = page;
 	}
 	currPage = rootPage;
 	++epoch;
 }
 
 void PagedAllocator::reset(void* offset) {
+	// Note: do not free pages after the one containing offset
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
-		if (offset >= page->buffer && offset < static_cast<const char*>(page->buffer) + page->size) {
+		if (isPointerInRange(offset, page->buffer, pageSize - sizeof(Page))) {
 			page->offset = offset;
 			currPage = page;
 			//++epoch;
@@ -203,24 +215,24 @@ inline void* PagedAllocator::getOffset() const {
 }
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
-	void* buffer = allocator->alloc(pageSize, Allocator::defaultAlignment);
-	if (buffer) {
+	// Single allocation for both page and buffer
+	void* page = allocator->alloc(pageSize, Allocator::defaultAlignment);
+	if (page) {
+		void*      buffer = advancePointer(page, sizeof(Page));
 		const Page newPage {
 			.prev = nullptr,
 			.buffer = buffer,
-			.offset = advancePointer(buffer, sizeof(Page)),
+			.offset = buffer,
 			.lastAllocation = nullptr,
-			.size = pageSize - sizeof(Page),
 		};
-		std::memcpy(buffer, &newPage, sizeof newPage);
-		++pageCount;
+		std::memcpy(page, &newPage, sizeof newPage);
 	}
-	return static_cast<Page*>(buffer);
+	return static_cast<Page*>(page);
 }
 
 void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) const {
-	size_t freeSize = reinterpret_cast<uintptr_t>(page.buffer) + page.size - reinterpret_cast<uintptr_t>(page.offset);
-	assert(freeSize <= page.size - sizeof(Page));
+	size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(page.buffer, page.offset);
+	assert(freeSize <= pageSize - sizeof(Page));
 	void* result = std::align(alignment, size, page.offset, freeSize);
 	if (result) {
 		page.lastAllocation = result;
@@ -244,7 +256,7 @@ size_t PagedAllocator::getCapacity() const {
 size_t PagedAllocator::getAllocatedSize() const {
 	size_t size = 0;
 	for (const Page* page = currPage; page; page = page->prev) {
-		size += static_cast<const char*>(page->offset) - static_cast<const char*>(page->buffer);
+		size += pointerDiffU(page->offset, page->buffer);
 	}
 	return size;
 }

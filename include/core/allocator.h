@@ -167,22 +167,22 @@ public:
 	static constexpr size_t defaultPageSize = 65536;
 
 private:
-	struct Page;
+	struct Page {
+		Page* prev;
+		Page* next;
+		void* buffer;
+		void* offset;
+		void* lastAllocation;
+	};
+
 	Page* allocPage();
 	void* allocFromPage(Page& page, size_t size, size_t alignment) const;
 
 private:
-	struct Page {
-		Page*  prev;
-		void*  buffer;
-		void*  offset;
-		void*  lastAllocation;
-		size_t size;
-	};
 	HeapAllocator* allocator;
 	size_t         pageSize;
+	Page*          rootPage;
 	Page*          currPage;
-	size_t         pageCount;
 	uint32_t       epoch;
 };
 

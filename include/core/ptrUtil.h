@@ -32,7 +32,20 @@ inline const void* advancePointer(const void* ptr, ptrdiff_t offset) {
 }
 
 inline intptr_t pointerDiff(const void* a, const void* b) {
-	return static_cast<const std::byte*>(a) - static_cast<const std::byte*>(b);
+	return static_cast<const std::byte*>(b) - static_cast<const std::byte*>(a);
+}
+
+inline uintptr_t pointerDiffU(const void* a, const void* b) {
+	assert(b >= a);
+	return static_cast<const std::byte*>(b) - static_cast<const std::byte*>(a);
+}
+
+inline bool isPointerInRange(const void* ptr, const void* first, size_t rangeSize) {
+	return (ptr >= first && ptr < static_cast<const char*>(first) + rangeSize);
+}
+
+inline bool isPointerInRange(const void* ptr, const void* first, const void* last) {
+	return (ptr >= first && ptr <= last);
 }
 
 template <typename T>
