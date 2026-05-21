@@ -58,6 +58,10 @@ public:
 		o._data = nullptr;
 		o._size = 0;
 		o._cap = 0;
+#ifdef _DEBUG
+			_epoch = o._epoch;
+			o._epoch = 0;
+#endif
 	}
 
 	ArenaVector& operator=(ArenaVector&& o) noexcept {
@@ -70,6 +74,10 @@ public:
 			o._data = nullptr;
 			o._size = 0;
 			o._cap = 0;
+#ifdef _DEBUG
+			_epoch = o._epoch;
+			o._epoch = 0;
+#endif
 		}
 		return *this;
 	}
