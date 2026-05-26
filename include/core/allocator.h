@@ -18,6 +18,11 @@ public:
 
 	virtual void* alloc(size_t size, size_t alignment) = 0;
 	virtual void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) = 0;
+	virtual void  free(void* ptr, size_t size) = 0;
+#ifdef _DEBUG
+	virtual uint32_t getEpoch() const = 0;
+	virtual void     check(void* ptr, uint32_t ptrEpoch) = 0;
+#endif
 
 	// Helpers
 	template <class T, bool zero = false>
@@ -63,14 +68,6 @@ public:
 		void* ptr = alloc(sizeof(T), alignof(T));
 		return ptr ? new (ptr) T { std::forward<ArgTypes>(args)... } : nullptr;
 	}
-};
-
-/**
- * @brief Heap allocator
- */
-class HeapAllocator : public Allocator {
-public:
-	virtual void free(void* ptr, size_t size) = 0;
 
 	template <class T>
 	void destroy(T* obj) {
@@ -95,36 +92,23 @@ class ArenaAllocator : public Allocator {
 public:
 	using Allocator::alloc;
 
-	virtual void     reset() = 0;
-	virtual void     reset(void* offset) = 0;
-	virtual void*    getOffset() const = 0;
-	virtual uint32_t getEpoch() const = 0;
-
-	template <class T>
-	void destroy(T* obj) {
-		if (obj) {
-			obj->~T();
-		}
-	}
-
-	template <class T>
-	void destroyArray(T* objs, size_t n) {
-		if (objs) {
-			for (size_t i = 0; i < n; ++i) {
-				objs[i].~T();
-			}
-		}
-	}
+	virtual void  reset() = 0;
+	virtual void  reset(void* offset) = 0;
+	virtual void* getOffset() const = 0;
 };
 
 /**
  * @brief Heap allocator implementation using malloc, free and realloc
  */
-class C_Allocator final : public HeapAllocator {
+class HeapAllocator final : public Allocator {
 public:
 	void* alloc(size_t size, size_t alignment) override;
 	void  free(void* ptr, size_t size) override;
 	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
+#ifdef _DEBUG
+	uint32_t getEpoch() const override;
+	void     check(void* ptr, uint32_t ptrEpoch) override;
+#endif
 };
 
 class BufferAllocator final : public ArenaAllocator {
@@ -133,17 +117,21 @@ public:
 	BufferAllocator(HeapAllocator& backingAllocator, size_t bufferSize);
 	~BufferAllocator();
 
-	void*    alloc(size_t size, size_t alignment) override;
-	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void     reset() override;
-	void     reset(void* offset) override;
-	void*    getOffset() const override;
+	void* alloc(size_t size, size_t alignment) override;
+	void* realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void  free(void* ptr, size_t size) override;
+	void  reset() override;
+	void  reset(void* offset) override;
+	void* getOffset() const override;
+	void* getBuffer() const;
+#ifdef _DEBUG
 	uint32_t getEpoch() const override;
-	void*    getBuffer() const;
+	void     check(void* ptr, uint32_t ptrEpoch) override;
+#endif
 
 private:
-	void*          buffer;
 	HeapAllocator* backingAllocator;
+	void*          buffer;
 	void*          curr;
 	size_t         bufferSize;
 	void*          lastAlloc;
@@ -157,12 +145,16 @@ public:
 
 	void*    alloc(size_t size, size_t alignment) override;
 	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void     free(void* ptr, size_t size) override;
 	void     reset() override;
 	void     reset(void* offset) override;
 	void*    getOffset() const override;
-	uint32_t getEpoch() const override;
 	size_t   getCapacity() const;
 	size_t   getAllocatedSize() const;
+#ifdef _DEBUG
+	uint32_t getEpoch() const override;
+	void check(void* ptr, uint32_t ptrEpoch) override;
+#endif
 
 	static constexpr size_t defaultPageSize = 65536;
 

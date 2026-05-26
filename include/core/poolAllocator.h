@@ -7,11 +7,11 @@
 
 namespace Typhoon {
 
-class HeapAllocator;
+class Allocator;
 
 class BasePoolAllocator {
 protected:
-	BasePoolAllocator(HeapAllocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment);
+	BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment);
 	~BasePoolAllocator();
 
 	void*  alloc();
@@ -25,18 +25,18 @@ private:
 private:
 	struct FreeSlot;
 
-	HeapAllocator& backingAllocator;
-	size_t         maxElements;
-	size_t         elementSize;
-	size_t         alignment;
-	void*          buffer;
-	FreeSlot*      nextFreeSlot;
+	Allocator& backingAllocator;
+	size_t     maxElements;
+	size_t     elementSize;
+	size_t     alignment;
+	void*      buffer;
+	FreeSlot*  nextFreeSlot;
 };
 
 template <class T>
 class PoolAllocator final : private BasePoolAllocator {
 public:
-	explicit PoolAllocator(HeapAllocator& backingAllocator, size_t maxElements)
+	explicit PoolAllocator(Allocator& backingAllocator, size_t maxElements)
 	    : BasePoolAllocator(backingAllocator, maxElements, sizeof(T), alignof(T)) {
 		static_assert(sizeof(T) % alignof(T) == 0);
 	}

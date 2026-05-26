@@ -7,7 +7,7 @@
 
 namespace Typhoon {
 
-void* C_Allocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
+void* HeapAllocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_malloc(size, alignment);
 #else
@@ -15,7 +15,7 @@ void* C_Allocator::alloc(size_t size, [[maybe_unused]] size_t alignment) {
 #endif
 }
 
-void C_Allocator::free(void* ptr, [[maybe_unused]] size_t size) {
+void HeapAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #ifdef _MSC_VER
 	::_aligned_free(ptr);
 #else
@@ -23,13 +23,23 @@ void C_Allocator::free(void* ptr, [[maybe_unused]] size_t size) {
 #endif
 }
 
-void* C_Allocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
+void* HeapAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t newSize, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
 	return _aligned_realloc(ptr, newSize, alignment);
 #else
 	return ::realloc(ptr, newSize);
 #endif
 }
+
+#ifdef _DEBUG
+uint32_t HeapAllocator::getEpoch() const {
+	return 0;
+}
+
+void HeapAllocator::check([[maybe_unused]] void* ptr, [[maybe_unused]] uint32_t ptrEpoch) {
+	// Rely on malloc builtin checks
+}
+#endif
 
 BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     : buffer(buffer)
@@ -85,6 +95,10 @@ void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_
 	}
 }
 
+void BufferAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t size) {
+	// nop
+}
+
 void BufferAllocator::reset() {
 	curr = buffer;
 	lastAlloc = nullptr;
@@ -104,13 +118,19 @@ void* BufferAllocator::getOffset() const {
 	return curr;
 }
 
+void* BufferAllocator::getBuffer() const {
+	return buffer;
+}
+
+#ifdef _DEBUG
 uint32_t BufferAllocator::getEpoch() const {
 	return epoch;
 }
 
-void* BufferAllocator::getBuffer() const {
-	return buffer;
+void BufferAllocator::check(void* ptr, uint32_t ptrEpoch) {
+	assert(ptrEpoch == this->epoch && isPointerInRange(ptr, buffer, curr));
 }
+#endif
 
 PagedAllocator::PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize)
     : allocator(&backingAllocator)
@@ -180,6 +200,27 @@ void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t
 	return res;
 }
 
+void PagedAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t size) {
+	// nop
+}
+
+#ifdef _DEBUG
+
+uint32_t PagedAllocator::getEpoch() const {
+	return epoch;
+}
+
+void PagedAllocator::check(void* ptr, uint32_t ptrEpoch) {
+	assert(ptrEpoch == this->epoch);
+	for (Page* page = currPage; page != nullptr; page = page->prev) {
+		if (isPointerInRange(ptr, page->buffer, pageSize - sizeof(Page))) {
+			return;
+		}
+	}
+	assert(false);
+}
+#endif
+
 void PagedAllocator::reset() {
 	for (Page* page = rootPage; page; page = page->next) {
 		page->offset = page->buffer;
@@ -230,10 +271,6 @@ void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) c
 		page.offset = advancePointer(result, size);
 	}
 	return result;
-}
-
-uint32_t PagedAllocator::getEpoch() const {
-	return epoch;
 }
 
 size_t PagedAllocator::getCapacity() const {

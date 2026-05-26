@@ -8,11 +8,11 @@
 
 namespace Typhoon {
 
-struct BasePoolAllocator::FreeSlot { // FIXME as uint32_t offset
+struct BasePoolAllocator::FreeSlot {
 	FreeSlot* next;
 };
 
-BasePoolAllocator::BasePoolAllocator(HeapAllocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment)
+BasePoolAllocator::BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment)
     : backingAllocator(backingAllocator)
     , maxElements(maxElements)
     , elementSize(elementSize)
