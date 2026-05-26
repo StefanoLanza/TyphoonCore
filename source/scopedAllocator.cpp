@@ -7,11 +7,10 @@ struct ScopedAllocator::Finalizer {
 	void (*destructor)(void* ptr);
 	void*      obj;
 	Finalizer* next;
-	size_t     objSize;
 };
 
-ScopedAllocator::ScopedAllocator(ArenaAllocator& allocator)
-    : allocator(allocator)
+ScopedAllocator::ScopedAllocator(ArenaAllocator& backingAllocator)
+    : backingAllocator(backingAllocator)
     , finalizerHead(nullptr) {
 }
 
@@ -19,12 +18,11 @@ ScopedAllocator::~ScopedAllocator() {
 	destroyAll();
 }
 
-void ScopedAllocator::registerObject(void* obj, size_t objSize, Destructor destructor) {
-	auto f = allocator.alloc<Finalizer>();
+void ScopedAllocator::registerObject(void* obj, Destructor destructor) {
+	auto f = backingAllocator.alloc<Finalizer>();
 	assert(f);
 	f->destructor = destructor;
 	f->obj = obj;
-	f->objSize = objSize;
 	f->next = finalizerHead;
 	finalizerHead = f;
 }
@@ -39,9 +37,15 @@ void ScopedAllocator::destroyAll() {
 		last = f->obj;
 	}
 	if (last) {
-		allocator.reset(last);
+		backingAllocator.reset(last);
 	}
 	finalizerHead = nullptr;
 }
+
+#ifdef _DEBUG
+uint32_t ScopedAllocator::getEpoch() const {
+	return backingAllocator.getEpoch();
+}
+#endif
 
 } // namespace Typhoon

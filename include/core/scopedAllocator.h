@@ -8,7 +8,7 @@ namespace Typhoon {
 
 class ScopedAllocator : Uncopyable {
 public:
-	explicit ScopedAllocator(ArenaAllocator& allocator);
+	explicit ScopedAllocator(ArenaAllocator& backingAllocator);
 	~ScopedAllocator();
 
 	template <class T, class... ArgTypes>
@@ -17,8 +17,8 @@ public:
 		if constexpr (! std::is_trivially_destructible_v<T>) {
 			destructor = destructorCall<T>;
 		}
-		T* ptr = allocator.construct<T>(std::forward<ArgTypes>(args)...);
-		registerObject(ptr, sizeof(T), destructor);
+		T* ptr = backingAllocator.construct<T>(std::forward<ArgTypes>(args)...);
+		registerObject(ptr, destructor);
 		return ptr;
 	}
 
@@ -26,19 +26,19 @@ public:
 	T* allocArray(size_t elementCount) {
 		T* ptr = nullptr;
 		if constexpr (std::is_trivially_default_constructible_v<T>) {
-			ptr = allocator.allocArray<T>(elementCount);
+			ptr = backingAllocator.allocArray<T>(elementCount);
 		}
 		else {
-			ptr = allocator.constructArray<T>(elementCount);
+			ptr = backingAllocator.constructArray<T>(elementCount);
 		}
 		if constexpr (std::is_trivially_destructible_v<T>) {
 			// Register first element only, to reset the allocator
-			registerObject(ptr, sizeof(T), nullptr);
+			registerObject(ptr, nullptr);
 		}
 		else {
 			// Register all array elements, from last to first
 			for (size_t i = elementCount; i > 0; --i) {
-				registerObject(ptr + i - 1, sizeof(T), destructorCall<T>);
+				registerObject(ptr + i - 1, destructorCall<T>);
 			}
 		}
 		return ptr;
@@ -46,9 +46,13 @@ public:
 
 	void destroyAll();
 
+#ifdef _DEBUG
+	uint32_t getEpoch() const;
+#endif
+
 private:
 	using Destructor = void (*)(void* ptr);
-	void registerObject(void* obj, size_t objSize, Destructor destructor);
+	void registerObject(void* obj, Destructor destructor);
 
 	template <typename T>
 	static void destructorCall(void* ptr) {
@@ -57,8 +61,8 @@ private:
 
 private:
 	struct Finalizer;
-	ArenaAllocator& allocator;
-	Finalizer*       finalizerHead;
+	ArenaAllocator& backingAllocator;
+	Finalizer*      finalizerHead;
 };
 
 } // namespace Typhoon
