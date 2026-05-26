@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 #include <utility>
 
 namespace Typhoon {
@@ -44,13 +45,11 @@ public:
 	T* create(ArgTypes&&... args) {
 		void* ptr = alloc();
 		assert(ptr);
-		return new (ptr) T(std::forward<ArgTypes>(args)...);
+		return new (ptr) T { std::forward<ArgTypes>(args)... };
 	}
 	void destroy(T* ptr) {
 		assert(ptr);
-		if constexpr (! std::is_trivially_destructible_v<T>) {
-			ptr->~T();
-		}
+		std::destroy_at(ptr);
 		free(ptr);
 	}
 
