@@ -10,7 +10,7 @@ namespace Typhoon {
 class Allocator;
 
 class BasePoolAllocator {
-protected:
+public:
 	BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment);
 	~BasePoolAllocator();
 
@@ -26,7 +26,9 @@ private:
 #endif
 
 private:
-	struct FreeSlot;
+	struct FreeSlot {
+		FreeSlot* next;
+	};
 
 	Allocator& backingAllocator;
 	size_t     maxElements;
@@ -40,31 +42,34 @@ private:
 };
 
 template <class T>
-class PoolAllocator final : private BasePoolAllocator {
+class PoolAllocator final {
 public:
 	explicit PoolAllocator(Allocator& backingAllocator, size_t maxElements)
-	    : BasePoolAllocator(backingAllocator, maxElements, sizeof(T), alignof(T)) {
+	    : base { backingAllocator, maxElements, sizeof(T), alignof(T) } {
 		static_assert(sizeof(T) % alignof(T) == 0);
 	}
 
 	template <class... ArgTypes>
 	T* create(ArgTypes&&... args) {
-		void* ptr = alloc();
+		void* ptr = base.alloc();
 		assert(ptr);
 		return new (ptr) T { std::forward<ArgTypes>(args)... };
 	}
 	void destroy(T* ptr) {
 		assert(ptr);
 		std::destroy_at(ptr);
-		free(ptr);
+		base.free(ptr);
 	}
 
 	void clear() requires(std::is_trivially_destructible_v<T>) {
-		BasePoolAllocator::clear();
+		base.clear();
 	}
 	size_t getCapacity() const {
-		return BasePoolAllocator::getCapacity();
+		return base.getCapacity();
 	}
+
+private:
+	BasePoolAllocator base;
 };
 
 } // namespace Typhoon

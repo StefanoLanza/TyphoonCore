@@ -8,10 +8,6 @@
 
 namespace Typhoon {
 
-struct BasePoolAllocator::FreeSlot {
-	FreeSlot* next;
-};
-
 BasePoolAllocator::BasePoolAllocator(Allocator& backingAllocator, size_t maxElements, size_t elementSize, size_t alignment)
     : backingAllocator(backingAllocator)
     , maxElements(maxElements)
