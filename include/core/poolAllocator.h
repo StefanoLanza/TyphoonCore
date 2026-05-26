@@ -21,6 +21,9 @@ protected:
 
 private:
 	void init();
+#ifdef _DEBUG
+	void debug();
+#endif
 
 private:
 	struct FreeSlot;
@@ -31,6 +34,9 @@ private:
 	size_t     alignment;
 	void*      buffer;
 	FreeSlot*  nextFreeSlot;
+#ifdef _DEBUG
+	uint32_t epoch = 0;
+#endif
 };
 
 template <class T>

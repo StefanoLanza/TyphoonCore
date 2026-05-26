@@ -114,7 +114,7 @@ public:
 class BufferAllocator final : public ArenaAllocator {
 public:
 	BufferAllocator(void* buffer, size_t bufferSize);
-	BufferAllocator(HeapAllocator& backingAllocator, size_t bufferSize);
+	BufferAllocator(Allocator& backingAllocator, size_t bufferSize);
 	~BufferAllocator();
 
 	void* alloc(size_t size, size_t alignment) override;
@@ -130,12 +130,12 @@ public:
 #endif
 
 private:
-	HeapAllocator* backingAllocator;
-	void*          buffer;
-	void*          curr;
-	size_t         bufferSize;
-	void*          lastAlloc;
-	uint32_t       epoch;
+	Allocator* backingAllocator;
+	void*      buffer;
+	void*      curr;
+	size_t     bufferSize;
+	void*      lastAlloc;
+	uint32_t   epoch;
 };
 
 class PagedAllocator final : public ArenaAllocator {
@@ -143,17 +143,17 @@ public:
 	PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
 
-	void*    alloc(size_t size, size_t alignment) override;
-	void*    realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void     free(void* ptr, size_t size) override;
-	void     reset() override;
-	void     reset(void* offset) override;
-	void*    getOffset() const override;
-	size_t   getCapacity() const;
-	size_t   getAllocatedSize() const;
+	void*  alloc(size_t size, size_t alignment) override;
+	void*  realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void   free(void* ptr, size_t size) override;
+	void   reset() override;
+	void   reset(void* offset) override;
+	void*  getOffset() const override;
+	size_t getCapacity() const;
+	size_t getAllocatedSize() const;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
-	void check(void* ptr, uint32_t ptrEpoch) override;
+	void     check(void* ptr, uint32_t ptrEpoch) override;
 #endif
 
 	static constexpr size_t defaultPageSize = 65536;

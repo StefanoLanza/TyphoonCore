@@ -50,7 +50,7 @@ BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     , epoch(0) {
 }
 
-BufferAllocator::BufferAllocator(HeapAllocator& backingAllocator, size_t bufferSize)
+BufferAllocator::BufferAllocator(Allocator& backingAllocator, size_t bufferSize)
     : buffer(backingAllocator.alloc(bufferSize, backingAllocator.defaultAlignment))
     , backingAllocator(&backingAllocator)
     , curr(buffer)
@@ -64,7 +64,7 @@ BufferAllocator::~BufferAllocator() {
 }
 
 void* BufferAllocator::alloc(size_t size, size_t alignment) {
-	size_t freeSize = pointerDiffU(buffer, curr) + bufferSize;
+	size_t freeSize = bufferSize - pointerDiffU(buffer, curr);
 	void*  result = std::align(alignment, size, curr, freeSize);
 	if (result) {
 		curr = advancePointer(result, size);
@@ -152,6 +152,7 @@ PagedAllocator::~PagedAllocator() {
 
 void* PagedAllocator::alloc(size_t size, size_t alignment) {
 	if (size > pageSize - sizeof(Page)) {
+		assert(false && "Increase page size or use heap");
 		return nullptr; // can never be satisfied
 	}
 
