@@ -24,11 +24,13 @@ platforms { "x86", "x64" }
 language "C++"
 location (workspacePath)
 characterset "MBCS"
-flags   { "MultiProcessorCompile", "NoPCH", }
+multiprocessorcompile "On"
+enablepch "Off"
 startproject "UnitTest"
 exceptionhandling "Off"
 cppdialect "c++20"
 rtti "Off"
+manifest "Off"
 
 filter { filter_msvc }
 	buildoptions {
@@ -65,7 +67,6 @@ filter { filter_msvc, filter_release, }
 
 filter { filter_debug }
 	defines { "_DEBUG", "DEBUG", }
-	flags   { "NoManifest", }
 	optimize("Off")
 	inlining "Default"
 	warnings "Extra"
@@ -74,13 +75,14 @@ filter { filter_debug }
 
 filter { filter_release }
 	defines { "NDEBUG", }
-	flags   { "NoManifest", "NoBufferSecurityCheck", "NoRuntimeChecks", }
 	optimize("Full")
 	inlining "Auto"
 	warnings "Extra"
 	symbols "Off"
 	runtime "Release"
 	linktimeoptimization "On"
+	runtimechecks "Off"
+	buffersecuritycheck "Off"
 
 filter { filter_clang, filter_debug, }
 	-- Address sanitizer for clang
@@ -89,8 +91,9 @@ filter { filter_clang, filter_debug, }
 		"/fsanitize=address",
 	}
 	-- Turn off incompatible options
-	flags { "NoIncrementalLink", "NoRuntimeChecks", }
 	editAndContinue "Off"
+	buffersecuritycheck "Off"
+	incrementallink "Off"
 
 filter {}
 
