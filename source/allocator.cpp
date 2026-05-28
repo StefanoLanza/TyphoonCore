@@ -31,6 +31,10 @@ void* HeapAllocator::realloc(void* ptr, [[maybe_unused]] size_t currSize, size_t
 #endif
 }
 
+size_t HeapAllocator::maxAllocSize() const {
+	return std::numeric_limits<size_t>::max();
+}
+
 #ifdef _DEBUG
 uint32_t HeapAllocator::getEpoch() const {
 	return 0;
@@ -47,7 +51,11 @@ BufferAllocator::BufferAllocator(void* buffer, size_t bufferSize)
     , curr(buffer)
     , bufferSize(bufferSize)
     , lastAlloc { nullptr }
-    , epoch(0) {
+#ifdef _DEBUG
+    , epoch(0)
+    , backingEpoch(0)
+#endif
+{
 }
 
 BufferAllocator::BufferAllocator(Allocator& backingAllocator, size_t bufferSize)
@@ -56,11 +64,17 @@ BufferAllocator::BufferAllocator(Allocator& backingAllocator, size_t bufferSize)
     , curr(buffer)
     , bufferSize(bufferSize)
     , lastAlloc { nullptr }
-    , epoch(0) {
+#ifdef _DEBUG
+    , epoch(0)
+    , backingEpoch(backingAllocator.getEpoch())
+#endif
+{
 }
 
 BufferAllocator::~BufferAllocator() {
-	backingAllocator->free(buffer, bufferSize);
+	if (backingAllocator) {
+		backingAllocator->free(buffer, bufferSize);
+	}
 }
 
 void* BufferAllocator::alloc(size_t size, size_t alignment) {
@@ -95,14 +109,22 @@ void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_
 	}
 }
 
-void BufferAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t size) {
-	// nop
+void BufferAllocator::free(void* ptr, [[maybe_unused]] size_t size) {
+	if (lastAlloc == ptr) {
+		curr = ptr;
+	}
+}
+
+size_t BufferAllocator::maxAllocSize() const {
+	return bufferSize;
 }
 
 void BufferAllocator::reset() {
 	curr = buffer;
 	lastAlloc = nullptr;
+#ifdef _DEBUG
 	++epoch;
+#endif
 }
 
 void BufferAllocator::reset(void* offs) {
@@ -111,7 +133,6 @@ void BufferAllocator::reset(void* offs) {
 	if (lastAlloc != offs) {
 		lastAlloc = nullptr;
 	}
-	//++epoch;
 }
 
 void* BufferAllocator::getOffset() const {
@@ -130,22 +151,34 @@ uint32_t BufferAllocator::getEpoch() const {
 void BufferAllocator::check(void* ptr, uint32_t ptrEpoch) {
 	assert(ptrEpoch == this->epoch && isPointerInRange(ptr, buffer, curr));
 }
+
+void BufferAllocator::debug() const {
+	if (backingAllocator) {
+		backingAllocator->check(buffer, backingEpoch);
+	}
+}
+
 #endif
 
-PagedAllocator::PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize)
-    : allocator(&backingAllocator)
+PagedAllocator::PagedAllocator(Allocator& backingAllocator, size_t pageSize)
+    : backingAllocator(&backingAllocator)
     , pageSize(pageSize)
     , rootPage(nullptr)
     , currPage(nullptr)
     , lastAllocation(nullptr)
-    , epoch(0) {
+#ifdef _DEBUG
+    , epoch(0)
+    , backingEpoch(0)
+#endif
+{
 	assert(pageSize > sizeof(Page));
+	assert(pageSize <= backingAllocator.maxAllocSize());
 }
 
 PagedAllocator::~PagedAllocator() {
 	for (Page* page = rootPage; page;) {
 		Page* next = page->next; // fetch before freeing page
-		allocator->free(page, pageSize);
+		backingAllocator->free(page, pageSize);
 		page = next;
 	}
 }
@@ -205,6 +238,10 @@ void PagedAllocator::free([[maybe_unused]] void* ptr, [[maybe_unused]] size_t si
 	// nop
 }
 
+size_t PagedAllocator::maxAllocSize() const {
+	return pageSize - sizeof(Page);
+}
+
 #ifdef _DEBUG
 
 uint32_t PagedAllocator::getEpoch() const {
@@ -223,15 +260,25 @@ void PagedAllocator::check(void* ptr, uint32_t ptrEpoch) {
 #endif
 
 void PagedAllocator::reset() {
+#ifdef _DEBUG
+	debug();
+#endif
+
 	for (Page* page = rootPage; page; page = page->next) {
 		page->offset = page->buffer;
 	}
 	currPage = rootPage;
 	lastAllocation = nullptr;
+#ifdef _DEBUG
 	++epoch;
+#endif
 }
 
 void PagedAllocator::reset(void* offset) {
+#ifdef _DEBUG
+	debug();
+#endif
+
 	// Note: do not free pages after the one containing offset
 	lastAllocation = nullptr;
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
@@ -251,7 +298,11 @@ inline void* PagedAllocator::getOffset() const {
 
 PagedAllocator::Page* PagedAllocator::allocPage() {
 	// Single allocation for both page and buffer
-	void* mem = allocator->alloc(pageSize, Allocator::defaultAlignment);
+#ifdef _DEBUG
+	backingEpoch = backingAllocator->getEpoch();
+#endif
+
+	void* mem = backingAllocator->alloc(pageSize, Allocator::defaultAlignment);
 	assert(mem);
 	void*      buffer = advancePointer(mem, sizeof(Page));
 	const Page newPage {
@@ -265,6 +316,9 @@ PagedAllocator::Page* PagedAllocator::allocPage() {
 }
 
 void* PagedAllocator::allocFromPage(Page& page, size_t size, size_t alignment) const {
+#ifdef _DEBUG
+	debug();
+#endif
 	size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(page.buffer, page.offset);
 	assert(freeSize <= pageSize - sizeof(Page));
 	void* result = std::align(alignment, size, page.offset, freeSize);
@@ -289,5 +343,11 @@ size_t PagedAllocator::getAllocatedSize() const {
 	}
 	return size;
 }
+
+#ifdef _DEBUG
+void PagedAllocator::debug() const {
+	assert(backingEpoch == backingAllocator->getEpoch());
+}
+#endif
 
 } // namespace Typhoon

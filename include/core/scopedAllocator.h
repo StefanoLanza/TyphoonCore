@@ -22,14 +22,14 @@ public:
 		return ptr;
 	}
 
-	template <class T>
-	T* allocArray(size_t elementCount) {
+	template <class T, class... ArgTypes>
+	T* allocArray(size_t elementCount, ArgTypes&&... args) {
 		T* ptr = nullptr;
 		if constexpr (std::is_trivially_default_constructible_v<T>) {
 			ptr = backingAllocator.allocArray<T>(elementCount);
 		}
 		else {
-			ptr = backingAllocator.constructArray<T>(elementCount);
+			ptr = backingAllocator.constructArray<T>(elementCount, std::forward<ArgTypes>(args)...);
 		}
 		if constexpr (std::is_trivially_destructible_v<T>) {
 			// Register first element only, to reset the allocator
@@ -48,6 +48,7 @@ public:
 
 #ifdef _DEBUG
 	uint32_t getEpoch() const;
+	void     debug() const;
 #endif
 
 private:

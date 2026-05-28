@@ -16,9 +16,10 @@ public:
 
 	virtual ~Allocator() = default;
 
-	virtual void* alloc(size_t size, size_t alignment) = 0;
-	virtual void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) = 0;
-	virtual void  free(void* ptr, size_t size) = 0;
+	virtual void*  alloc(size_t size, size_t alignment) = 0;
+	virtual void*  realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) = 0;
+	virtual void   free(void* ptr, size_t size) = 0;
+	virtual size_t maxAllocSize() const = 0;
 #ifdef _DEBUG
 	virtual uint32_t getEpoch() const = 0;
 	virtual void     check(void* ptr, uint32_t ptrEpoch) = 0;
@@ -90,8 +91,6 @@ public:
 
 class ArenaAllocator : public Allocator {
 public:
-	using Allocator::alloc;
-
 	virtual void  reset() = 0;
 	virtual void  reset(void* offset) = 0;
 	virtual void* getOffset() const = 0;
@@ -102,9 +101,10 @@ public:
  */
 class HeapAllocator final : public Allocator {
 public:
-	void* alloc(size_t size, size_t alignment) override;
-	void  free(void* ptr, size_t size) override;
-	void* realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
+	void*  alloc(size_t size, size_t alignment) override;
+	void*  realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) override;
+	void   free(void* ptr, size_t size) override;
+	size_t maxAllocSize() const override;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
 	void     check(void* ptr, uint32_t ptrEpoch) override;
@@ -117,16 +117,21 @@ public:
 	BufferAllocator(Allocator& backingAllocator, size_t bufferSize);
 	~BufferAllocator();
 
-	void* alloc(size_t size, size_t alignment) override;
-	void* realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
-	void  free(void* ptr, size_t size) override;
-	void  reset() override;
-	void  reset(void* offset) override;
-	void* getOffset() const override;
-	void* getBuffer() const;
+	void*  alloc(size_t size, size_t alignment) override;
+	void*  realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
+	void   free(void* ptr, size_t size) override;
+	size_t maxAllocSize() const override;
+	void   reset() override;
+	void   reset(void* offset) override;
+	void*  getOffset() const override;
+	void*  getBuffer() const;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
 	void     check(void* ptr, uint32_t ptrEpoch) override;
+#endif
+private:
+#ifdef _DEBUG
+	void debug() const;
 #endif
 
 private:
@@ -135,17 +140,21 @@ private:
 	void*      curr;
 	size_t     bufferSize;
 	void*      lastAlloc;
-	uint32_t   epoch;
+#ifdef _DEBUG
+	uint32_t epoch;
+	uint32_t backingEpoch;
+#endif
 };
 
 class PagedAllocator final : public ArenaAllocator {
 public:
-	PagedAllocator(HeapAllocator& backingAllocator, size_t pageSize = defaultPageSize);
+	PagedAllocator(Allocator& backingAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
 
 	void*  alloc(size_t size, size_t alignment) override;
 	void*  realloc(void* ptr, size_t oldSize, size_t newSize, size_t alignment) override;
 	void   free(void* ptr, size_t size) override;
+	size_t maxAllocSize() const override;
 	void   reset() override;
 	void   reset(void* offset) override;
 	void*  getOffset() const override;
@@ -168,14 +177,20 @@ private:
 
 	Page* allocPage();
 	void* allocFromPage(Page& page, size_t size, size_t alignment) const;
+#ifdef _DEBUG
+	void debug() const;
+#endif
 
 private:
-	HeapAllocator* allocator;
-	size_t         pageSize;
-	Page*          rootPage;
-	Page*          currPage;
-	void*          lastAllocation;
-	uint32_t       epoch;
+	Allocator* backingAllocator;
+	size_t     pageSize;
+	Page*      rootPage;
+	Page*      currPage;
+	void*      lastAllocation;
+#ifdef _DEBUG
+	uint32_t epoch;
+	uint32_t backingEpoch;
+#endif
 };
 
 } // namespace Typhoon

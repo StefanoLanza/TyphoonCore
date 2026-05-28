@@ -7,11 +7,14 @@ struct ScopedAllocator::Finalizer {
 	void (*destructor)(void* ptr);
 	void*      obj;
 	Finalizer* next;
+#ifdef _DEBUG
+	uint32_t backingEpoch;
+#endif
 };
 
 ScopedAllocator::ScopedAllocator(ArenaAllocator& backingAllocator)
-    : backingAllocator(backingAllocator)
-    , finalizerHead(nullptr) {
+    : backingAllocator { backingAllocator }
+    , finalizerHead { nullptr } {
 }
 
 ScopedAllocator::~ScopedAllocator() {
@@ -24,6 +27,9 @@ void ScopedAllocator::registerObject(void* obj, Destructor destructor) {
 	f->destructor = destructor;
 	f->obj = obj;
 	f->next = finalizerHead;
+#ifdef _DEBUG
+	f->backingEpoch = backingAllocator.getEpoch();
+#endif
 	finalizerHead = f;
 }
 
@@ -35,6 +41,9 @@ void ScopedAllocator::destroyAll() {
 		}
 		next = f->next;
 		last = f->obj;
+#ifdef _DEBUG
+		assert(backingAllocator.getEpoch() == f->backingEpoch);
+#endif
 	}
 	if (last) {
 		backingAllocator.reset(last);
@@ -45,6 +54,12 @@ void ScopedAllocator::destroyAll() {
 #ifdef _DEBUG
 uint32_t ScopedAllocator::getEpoch() const {
 	return backingAllocator.getEpoch();
+}
+
+void ScopedAllocator::debug() const {
+	for (const Finalizer *f = finalizerHead, *next = nullptr; f; f = next) {
+		assert(backingAllocator.getEpoch() == f->backingEpoch);
+	}
 }
 #endif
 
