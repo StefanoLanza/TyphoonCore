@@ -14,8 +14,8 @@ public:
 		hash = 0;
 	}
 
-	explicit SmallString(const char* str);
-	explicit SmallString(std::string_view sv);
+	SmallString(const char* str);
+	SmallString(std::string_view sv);
 
 	SmallString<L>& operator=(const char* str);
 	SmallString<L>& operator=(std::string_view sv);
