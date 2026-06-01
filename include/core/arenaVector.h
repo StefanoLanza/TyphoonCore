@@ -37,12 +37,7 @@ public:
 	    , _size(0)
 	    , _cap(0) {
 		reserve(n);
-		if constexpr (std::is_trivially_constructible_v<T>) {
-			std::memset(_data, 0, n * sizeof(T));
-		}
-		else {
-			std::uninitialized_default_construct(_data, _data + n);
-		}
+		std::uninitialized_value_construct(_data, _data + n);
 		_size = n;
 	}
 
@@ -59,8 +54,8 @@ public:
 		o._size = 0;
 		o._cap = 0;
 #ifdef _DEBUG
-			_epoch = o._epoch;
-			o._epoch = 0;
+		_epoch = o._epoch;
+		o._epoch = 0;
 #endif
 	}
 
@@ -197,13 +192,7 @@ public:
 		debug();
 #endif
 		if (new_size > _size) {
-			if constexpr (std::is_trivially_default_constructible_v<T>) {
-				// zero-init new POD elements
-				std::memset(_data + _size, 0, (new_size - _size) * sizeof(T));
-			}
-			else {
-				std::uninitialized_default_construct(_data + _size, _data + new_size);
-			}
+			std::uninitialized_value_construct(_data + _size, _data + new_size);
 		}
 		else if (new_size < _size) {
 			std::destroy(_data + new_size, _data + _size);
@@ -253,9 +242,11 @@ public:
 			for (; src != end_it; ++dst, ++src) {
 				if constexpr (std::is_move_assignable_v<T>) {
 					*dst = std::move(*src);
-				} else if constexpr (std::is_copy_assignable_v<T>) {
+				}
+				else if constexpr (std::is_copy_assignable_v<T>) {
 					*dst = *src;
-				} else {
+				}
+				else {
 					std::destroy_at(dst);
 					::new (dst) T(std::move(*src));
 				}
@@ -309,7 +300,6 @@ public:
 	}
 
 private:
-
 	size_t grow_to(size_t min_needed) const {
 		size_t n = (_cap ? _cap * 2 : 1);
 		while (n < min_needed) {
@@ -344,7 +334,7 @@ private:
 		_epoch = _allocator->getEpoch();
 #endif
 	}
-	
+
 	void destroyAll() {
 #ifdef _DEBUG
 		debug();
@@ -354,15 +344,17 @@ private:
 
 #ifdef _DEBUG
 	void debug() const {
-		assert(_data == nullptr || (_epoch == _allocator->getEpoch()));
+		if (_data) {
+			_allocator->check(_data, _epoch);
+		}
 	}
 #endif
 
 private:
 	ArenaAllocator* _allocator;
-	T*               _data;
-	size_t           _size;
-	size_t           _cap;
+	T*              _data;
+	size_t          _size;
+	size_t          _cap;
 #ifdef _DEBUG
 	uint32_t _epoch = 0;
 #endif

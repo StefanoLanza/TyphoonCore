@@ -22,7 +22,7 @@ public:
 	virtual size_t maxAllocSize() const = 0;
 #ifdef _DEBUG
 	virtual uint32_t getEpoch() const = 0;
-	virtual void     check(void* ptr, uint32_t ptrEpoch) = 0;
+	virtual void     check(const void* ptr, uint32_t ptrEpoch) = 0;
 #endif
 
 	// Helpers
@@ -107,7 +107,7 @@ public:
 	size_t maxAllocSize() const override;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
-	void     check(void* ptr, uint32_t ptrEpoch) override;
+	void     check(const void* ptr, uint32_t ptrEpoch) override;
 #endif
 };
 
@@ -127,7 +127,7 @@ public:
 	void*  getBuffer() const;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
-	void     check(void* ptr, uint32_t ptrEpoch) override;
+	void     check(const void* ptr, uint32_t ptrEpoch) override;
 #endif
 private:
 #ifdef _DEBUG
@@ -162,7 +162,7 @@ public:
 	size_t getAllocatedSize() const;
 #ifdef _DEBUG
 	uint32_t getEpoch() const override;
-	void     check(void* ptr, uint32_t ptrEpoch) override;
+	void     check(const void* ptr, uint32_t ptrEpoch) override;
 #endif
 
 	static constexpr size_t defaultPageSize = 65536;

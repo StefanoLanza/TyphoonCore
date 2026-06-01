@@ -40,7 +40,7 @@ uint32_t HeapAllocator::getEpoch() const {
 	return 0;
 }
 
-void HeapAllocator::check([[maybe_unused]] void* ptr, [[maybe_unused]] uint32_t ptrEpoch) {
+void HeapAllocator::check([[maybe_unused]] const void* ptr, [[maybe_unused]] uint32_t ptrEpoch) {
 	// Rely on malloc builtin checks
 }
 #endif
@@ -148,7 +148,7 @@ uint32_t BufferAllocator::getEpoch() const {
 	return epoch;
 }
 
-void BufferAllocator::check(void* ptr, uint32_t ptrEpoch) {
+void BufferAllocator::check(const void* ptr, uint32_t ptrEpoch) {
 	assert(ptrEpoch == this->epoch && isPointerInRange(ptr, buffer, curr));
 }
 
@@ -248,8 +248,8 @@ uint32_t PagedAllocator::getEpoch() const {
 	return epoch;
 }
 
-void PagedAllocator::check(void* ptr, uint32_t ptrEpoch) {
-	assert(ptrEpoch == this->epoch);
+void PagedAllocator::check(const void* ptr, uint32_t ptrEpoch) {
+	assert(ptrEpoch == epoch);
 	for (Page* page = currPage; page != nullptr; page = page->prev) {
 		if (isPointerInRange(ptr, page->buffer, pageSize - sizeof(Page))) {
 			return;
@@ -285,7 +285,6 @@ void PagedAllocator::reset(void* offset) {
 		if (isPointerInRange(offset, page->buffer, pageSize - sizeof(Page))) {
 			page->offset = offset;
 			currPage = page;
-			//++epoch;
 			return;
 		}
 	}
@@ -346,7 +345,9 @@ size_t PagedAllocator::getAllocatedSize() const {
 
 #ifdef _DEBUG
 void PagedAllocator::debug() const {
-	assert(backingEpoch == backingAllocator->getEpoch());
+	for (const Page* page = rootPage; page; page = page->next) {
+		backingAllocator->check(page, backingEpoch);
+	}
 }
 #endif
 

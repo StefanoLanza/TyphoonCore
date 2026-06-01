@@ -25,13 +25,13 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
-	explicit HeapVector(HeapAllocator& allocator) noexcept
+	explicit HeapVector(HeapAllocator& allocator)
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
 	    , _cap(0) {
 	}
-	explicit HeapVector(HeapAllocator& allocator, size_t n) noexcept
+	explicit HeapVector(HeapAllocator& allocator, size_t n)
 	    : _allocator { &allocator }
 	    , _data(nullptr)
 	    , _size(0)
@@ -43,7 +43,7 @@ public:
 	HeapVector(const HeapVector&) = delete;
 	HeapVector& operator=(const HeapVector&) = delete;
 
-	HeapVector(HeapVector&& o) noexcept
+	HeapVector(HeapVector&& o)
 	    : _allocator { o._allocator }
 	    , _data(o._data)
 	    , _size(o._size)
@@ -53,7 +53,7 @@ public:
 		o._cap = 0;
 	}
 
-	HeapVector& operator=(HeapVector&& o) noexcept {
+	HeapVector& operator=(HeapVector&& o) {
 		if (this != &o) {
 			assert(_allocator == o._allocator && "Move-assigning between vectors with different allocators");
 			clear();
@@ -77,11 +77,11 @@ public:
 		return emplace_back(v);
 	}
 
-	T& push_back(T&& v) noexcept {
+	T& push_back(T&& v) {
 		return emplace_back(std::move(v));
 	}
 
-	void pop_back() noexcept {
+	void pop_back() {
 		assert(_size > 0);
 		if constexpr (! std::is_trivially_destructible_v<T>) {
 			std::destroy_at(_data + _size - 1);
@@ -99,70 +99,64 @@ public:
 		return *slot;
 	}
 
-	T& operator[](size_t i) noexcept {
+	T& operator[](size_t i) {
 		assert(i < _size);
 		return _data[i];
 	}
-	const T& operator[](size_t i) const noexcept {
+	const T& operator[](size_t i) const {
 		assert(i < _size);
 		return _data[i];
 	}
 
-	T& front() noexcept {
+	T& front() {
 		assert(_size > 0);
 		return _data[0];
 	}
-	const T& front() const noexcept {
+	const T& front() const {
 		assert(_size > 0);
 		return _data[0];
 	}
 
-	T& back() noexcept {
+	T& back() {
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
-	const T& back() const noexcept {
+	const T& back() const {
 		assert(_size > 0);
 		return _data[_size - 1];
 	}
 
-	T* data() noexcept {
+	T* data() {
 		return _data;
 	}
-	const T* data() const noexcept {
+	const T* data() const {
 		return _data;
 	}
-	size_t size() const noexcept {
+	size_t size() const {
 		return _size;
 	}
-	size_t capacity() const noexcept {
+	size_t capacity() const {
 		return _cap;
 	}
 
-	bool empty() const noexcept {
+	bool empty() const {
 		return _size == 0;
 	}
 
-	void reserve(size_t new_cap) noexcept {
+	void reserve(size_t new_cap) {
 		if (new_cap <= _cap) {
 			return;
 		}
 		reallocate(new_cap);
 	}
 
-	void resize(size_t new_size) noexcept {
+	void resize(size_t new_size) {
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
 		if (new_size > _size) {
-			if constexpr (std::is_trivially_default_constructible_v<T>) {
-				// zero-init new POD elements
-				std::memset(_data + _size, 0, (new_size - _size) * sizeof(T));
-			}
-			else {
-				std::uninitialized_default_construct(_data + _size, _data + new_size);
-			}
+			std::uninitialized_value_construct(_data + _size, _data + new_size);
 		}
 		else if (new_size < _size) {
 			std::destroy(_data + new_size, _data + _size);
@@ -170,7 +164,7 @@ public:
 		_size = new_size;
 	}
 
-	void resize(size_t new_size, const T& value) noexcept {
+	void resize(size_t new_size, const T& value) {
 		if (new_size > _cap) {
 			reserve(grow_to(new_size));
 		}
@@ -183,12 +177,12 @@ public:
 		_size = new_size;
 	}
 
-	void erase(iterator it) noexcept {
+	void erase(iterator it) {
 		erase(it, it + 1);
 	}
 
 	// erase range [first, last)
-	void erase(iterator first, iterator last) noexcept {
+	void erase(iterator first, iterator last) {
 		assert(first <= last && first >= _data && last <= _data + _size);
 
 		const size_t count = static_cast<size_t>(last - first);

@@ -58,7 +58,8 @@ uint32_t ScopedAllocator::getEpoch() const {
 
 void ScopedAllocator::debug() const {
 	for (const Finalizer *f = finalizerHead, *next = nullptr; f; f = next) {
-		assert(backingAllocator.getEpoch() == f->backingEpoch);
+		backingAllocator.check(f, f->backingEpoch);
+		backingAllocator.check(f->obj, f->backingEpoch);
 	}
 }
 #endif
