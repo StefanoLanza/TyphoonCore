@@ -39,6 +39,16 @@ public:
 		resize(n);
 	}
 
+	HeapVector(Allocator& allocator, std::initializer_list<T> list) requires(std::is_copy_constructible_v<T>)
+	    : _allocator { &allocator }
+	    , _data { nullptr }
+	    , _size { 0 }
+	    , _cap(0) {
+		reserve(list.size());
+		std::uninitialized_copy(list.begin(), list.end(), _data);
+		_size = list.size();
+	}
+
 	// not copyable
 	HeapVector(const HeapVector&) = delete;
 	HeapVector& operator=(const HeapVector&) = delete;
@@ -201,9 +211,11 @@ public:
 			for (; src != end_it; ++dst, ++src) {
 				if constexpr (std::is_move_assignable_v<T>) {
 					*dst = std::move(*src);
-				} else if constexpr (std::is_copy_assignable_v<T>) {
+				}
+				else if constexpr (std::is_copy_assignable_v<T>) {
 					*dst = *src;
-				} else {
+				}
+				else {
 					std::destroy_at(dst);
 					::new (dst) T(std::move(*src));
 				}
