@@ -1,7 +1,7 @@
 #pragma once
 
 #include <core/base.h>
-#include <core/id.h>
+#include <core/stringId.h>
 #include <core/uncopyable.h>
 #include <cstdint>
 #include <cstring>
@@ -10,9 +10,6 @@
 namespace Typhoon {
 
 class Allocator;
-
-struct StringTag;
-using StringId = Id<StringTag, uint32, -1>;
 
 class StringTable : private Uncopyable {
 public:

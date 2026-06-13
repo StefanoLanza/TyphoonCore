@@ -67,9 +67,11 @@ StringId StringTable::insert(std::string_view sv) {
 
 	// Insert new string
 	if (_numEntries >= _maxStrings) {
+		assert(false);
 		return {};
 	}
 	if (static_cast<uint64>(_strOffs) + len + 1 > _strCapacity) {
+		assert(false);
 		return {};
 	}
 
@@ -82,7 +84,7 @@ StringId StringTable::insert(std::string_view sv) {
 	};
 
 	std::memcpy(strings + _strOffs, sv.data(), len);
-	strings[_strOffs] = 0; // null terminat
+	strings[_strOffs + len] = 0; // null terminate
 	_strOffs += len + 1;
 	buckets[bucketIdx] = id;
 
