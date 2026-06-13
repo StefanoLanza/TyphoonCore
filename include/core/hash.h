@@ -10,6 +10,7 @@ uint32_t hash32(const char* data, size_t len);
 uint32_t hash32(const char* str);
 uint32_t hash32(std::string_view str);
 uint64_t hash64(const char* data, size_t len);
+uint32_t FNVhash32(const char* data, size_t len);
 
 template <class T>
 uint32_t hash32(const T& obj) {

@@ -4,9 +4,13 @@
 
 namespace Typhoon {
 
-uint32_t hash32(const char* data, size_t len) {
-#define get16bits(d) (*((const uint16_t*)(d)))
+static inline uint16_t get16bits(const char* d) {
+	uint16_t v;
+	std::memcpy(&v, d, sizeof(v));
+	return v;
+}
 
+uint32_t hash32(const char* data, size_t len) {
 	uint32_t  hash = static_cast<uint32_t>(len);
 	uint32_t  tmp;
 	const int rem = len & 3;
@@ -49,8 +53,15 @@ uint32_t hash32(const char* data, size_t len) {
 	hash ^= hash << 25;
 	hash += hash >> 6;
 
-#undef get16bits
+	return hash;
+}
 
+uint32_t FNVhash32(const char* data, size_t len) {
+	uint32_t hash = 2166136261u;
+	for (size_t i = 0; i < len; i++) {
+		hash ^= static_cast<uint8_t>(data[i]);
+		hash *= 16777619u;
+	}
 	return hash;
 }
 
@@ -64,7 +75,7 @@ uint32_t hash32(std::string_view str) {
 }
 
 uint64_t hash64(const char* data, size_t len) {
-	return std::hash<std::string_view>{}(std::string_view{data, len});
+	return std::hash<std::string_view> {}(std::string_view { data, len });
 }
 
 } // namespace Typhoon
