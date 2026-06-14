@@ -13,37 +13,27 @@ class Allocator;
 
 class StringTable : private Uncopyable {
 public:
-	explicit StringTable(Allocator& allocator, size_t bufferSize, uint32 maxStrings);
+	explicit StringTable(Allocator& allocator, size_t bufferSize);
 	~StringTable();
 
-	static size_t requiredBufferSize(uint32 maxStrings, size_t stringDataCapacity);
-
-	bool             empty() const;
-	StringId         insert(std::string_view sv);
-	std::string_view fetch(StringId strId) const;
-	bool             compare(StringId first, std::string_view second) const;
+	[[nodiscard]] bool             empty() const;
+	[[nodiscard]] StringId         insert(std::string_view sv);
+	[[nodiscard]] std::string_view fetch(StringId strId) const;
+	[[nodiscard]] bool             compare(StringId first, std::string_view second) const;
 
 private:
 	struct Entry;
+	using Index = uint16;
+
 	const Entry* getEntries() const;
-	const char*  getStringBuffer() const;
+	Index*       getBuckets() const;
 
 private:
-	static constexpr uint32 _bucketCount = 64;
-
 	Allocator& _allocator;
 	char*      _buffer;
 	size_t     _bufferSize;
-	uint32     _maxStrings;
-	uint32     _strOffs;
-	uint32     _strCapacity;
+	uint32     _strBytesUsed;
 	uint32     _numEntries;
-};
-
-class StringHandle {
-public:
-	StringHandle(const char* str);
-	StringHandle(StringId strId);
 };
 
 } // namespace Typhoon

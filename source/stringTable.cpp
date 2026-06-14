@@ -2,36 +2,32 @@
 #include <cassert>
 #include <core/allocator.h>
 #include <core/hash.h>
+#include <limits>
 
 namespace Typhoon {
 
 struct StringTable::Entry {
 	uint32 offs;
 	uint32 hash;
-	uint32 len; // TODO with string ?
-	uint32 next;
+	Index  next;
+	uint16 len;
 };
 
-size_t StringTable::requiredBufferSize(uint32 maxStrings, size_t stringDataCapacity) {
-	// +maxStrings: one null termination per string
-	return sizeof(uint32) * _bucketCount + sizeof(Entry) * maxStrings + stringDataCapacity + maxStrings;
-}
+constexpr uint32 bucketCount = 256;
 
-StringTable::StringTable(Allocator& allocator, size_t bufferSize, uint32 maxStrings)
+// Buffer layout is | buckets | entries -> ... <- strings |
+StringTable::StringTable(Allocator& allocator, size_t bufferSize)
     : _allocator { allocator }
     , _buffer { static_cast<char*>(allocator.alloc(bufferSize, 1)) }
     , _bufferSize { bufferSize }
-    , _maxStrings { maxStrings }
-    , _strOffs { 0 }
+    , _strBytesUsed { 0 }
     , _numEntries { 0 } {
 
-	const size_t overhead = sizeof(uint32) * _bucketCount + sizeof(Entry) * maxStrings;
-	assert(bufferSize > overhead && "bufferSize too small to hold buckets and entries");
-	_strCapacity = static_cast<uint32>(_bufferSize - overhead);
+	assert(bufferSize > sizeof(Index) * bucketCount && "bufferSize too small to hold buckets and entries");
 
-	uint32* buckets = reinterpret_cast<uint32*>(_buffer);
-	for (uint32_t i = 0; i < _bucketCount; i++) {
-		buckets[i] = UINT32_MAX;
+	Index* buckets = getBuckets();
+	for (uint32_t i = 0; i < bucketCount; i++) {
+		buckets[i] = (Index)-1;
 	}
 }
 
@@ -45,48 +41,53 @@ bool StringTable::empty() const {
 
 StringId StringTable::insert(std::string_view sv) {
 	const uint32 len = (uint32)sv.length();
-	uint32*      buckets = reinterpret_cast<uint32*>(_buffer);
-	Entry*       entries = reinterpret_cast<Entry*>(buckets + _bucketCount);
-	char*        strings = reinterpret_cast<char*>(entries + _maxStrings);
+	assert(len <= 255);
+	Index* buckets = getBuckets();
+	Entry* entries = reinterpret_cast<Entry*>(buckets + bucketCount);
 
 	const uint32 hash = FNVhash32(sv.data(), sv.length());
-	const uint32 bucketIdx = hash % _bucketCount;
+	const uint32 bucketIdx = hash % bucketCount;
 
 	// Search string
-	uint32 e = buckets[bucketIdx];
-	while (e != UINT32_MAX) {
+	Index e = buckets[bucketIdx];
+	while (e != (Index)-1) {
 		const Entry& entry = entries[e];
 		if (entry.hash == hash && entry.len == len) {
-			const char* existing = strings + entry.offs;
-			if (std::memcmp(existing, sv.data(), len) == 0) {
-				return StringId { e };
-			}
+#ifdef _DEBUG
+			assert(std::memcmp(_buffer + entry.offs, sv.data(), len) == 0 && "hash collision detected");
+#endif
+			return StringId { e };
 		}
 		e = entry.next;
 	}
 
 	// Insert new string
-	if (_numEntries >= _maxStrings) {
-		assert(false);
-		return {};
-	}
-	if (static_cast<uint64>(_strOffs) + len + 1 > _strCapacity) {
-		assert(false);
+	// Compute where the new string and new entry would land
+	// Strings grow downward from the top of the buffer
+	const uint32 newStrBytesUsed = _strBytesUsed + len + 1; // +1 for '\0'
+	const uint32 strOffs = static_cast<uint32>(_bufferSize) - newStrBytesUsed;
+
+	const Entry* nextEntry = entries + _numEntries;
+
+	// Single unified collision check: entry region vs string region
+	if (reinterpret_cast<const char*>(nextEntry + 1) > _buffer + strOffs) {
+		assert(false && "Full buffer");
 		return {};
 	}
 
+	std::memcpy(_buffer + strOffs, sv.data(), len);
+	_buffer[strOffs + len] = '\0';
+
+	assert(_numEntries < std::numeric_limits<Index>::max() && "entry count exceeds range");
 	const uint32 id = _numEntries++;
+	_strBytesUsed = newStrBytesUsed;
 	entries[id] = {
-		.offs = _strOffs,
+		.offs = strOffs,
 		.hash = hash,
-		.len = len,
 		.next = buckets[bucketIdx],
+		.len = static_cast<uint8>(len),
 	};
-
-	std::memcpy(strings + _strOffs, sv.data(), len);
-	strings[_strOffs + len] = 0; // null terminate
-	_strOffs += len + 1;
-	buckets[bucketIdx] = id;
+	buckets[bucketIdx] = static_cast<Index>(id);
 
 	return StringId { id };
 }
@@ -94,25 +95,25 @@ StringId StringTable::insert(std::string_view sv) {
 std::string_view StringTable::fetch(StringId strId) const {
 	assert(strId);
 	const Entry& e = getEntries()[strId.getValue()];
-	return { getStringBuffer() + e.offs, e.len };
+	return { _buffer + e.offs, e.len };
 }
 
 bool StringTable::compare(StringId first, std::string_view second) const {
 	assert(first);
 	const Entry& e = getEntries()[first.getValue()];
 	if (e.len == second.length()) {
-		const char* str = getStringBuffer() + e.offs;
+		const char* str = _buffer + e.offs;
 		return (std::memcmp(str, second.data(), second.length()) == 0);
 	}
 	return false;
 }
 
 const StringTable::Entry* StringTable::getEntries() const {
-	return reinterpret_cast<const Entry*>(_buffer + sizeof(uint32) * _bucketCount);
+	return reinterpret_cast<const Entry*>(_buffer + sizeof(Index) * bucketCount);
 }
 
-const char* StringTable::getStringBuffer() const {
-	return _buffer + sizeof(uint32) * _bucketCount + sizeof(Entry) * _maxStrings;
+StringTable::Index* StringTable::getBuckets() const {
+	return reinterpret_cast<Index*>(_buffer);
 }
 
 } // namespace Typhoon
