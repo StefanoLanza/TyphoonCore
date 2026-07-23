@@ -39,7 +39,7 @@ public:
 		resize(n);
 	}
 
-	HeapVector(Allocator& allocator, std::initializer_list<T> list) requires(std::is_copy_constructible_v<T>)
+	HeapVector(HeapAllocator& allocator, std::initializer_list<T> list) requires(std::is_copy_constructible_v<T>)
 	    : _allocator { &allocator }
 	    , _data { nullptr }
 	    , _size { 0 }
