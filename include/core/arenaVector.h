@@ -370,4 +370,12 @@ private:
 #endif
 };
 
+template <class T, class Pred>
+typename ArenaVector<T>::size_type erase_if(ArenaVector<T>& c, Pred pred) {
+	auto it = std::remove_if(c.begin(), c.end(), pred);
+	auto count = static_cast<typename ArenaVector<T>::size_type>(std::distance(it, c.end()));
+	c.erase(it, c.end());
+	return count;
+}
+
 } // namespace Typhoon

@@ -308,4 +308,12 @@ private:
 	size_t         _cap;
 };
 
+template <class T, class Pred>
+typename HeapVector<T>::size_type erase_if(HeapVector<T>& c, Pred pred) {
+	auto it = std::remove_if(c.begin(), c.end(), pred);
+	auto count = static_cast<typename HeapVector<T>::size_type>(std::distance(it, c.end()));
+	c.erase(it, c.end());
+	return count;
+}
+
 } // namespace Typhoon
