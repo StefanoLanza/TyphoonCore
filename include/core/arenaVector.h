@@ -289,6 +289,21 @@ public:
 		_size = newSize;
 	}
 
+	template <class Pred>
+	size_type erase_if(Pred pred) {
+		auto it = std::remove_if(begin(), end(), pred);
+		auto count = static_cast<size_type>(std::distance(it, end()));
+		erase(it, end());
+		return count;
+	}
+
+	size_type erase(const T& value) {
+		auto it = std::remove(begin(), end(), value);
+		auto removed = static_cast<size_type>(std::distance(it, end()));
+		erase(it, end());
+		return removed;
+	}
+
 	// ---- iterators ----
 	iterator begin() {
 		return _data;
@@ -369,13 +384,5 @@ private:
 	uint32_t _epoch = 0;
 #endif
 };
-
-template <class T, class Pred>
-typename ArenaVector<T>::size_type erase_if(ArenaVector<T>& c, Pred pred) {
-	auto it = std::remove_if(c.begin(), c.end(), pred);
-	auto count = static_cast<typename ArenaVector<T>::size_type>(std::distance(it, c.end()));
-	c.erase(it, c.end());
-	return count;
-}
 
 } // namespace Typhoon
