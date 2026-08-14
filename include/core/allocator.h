@@ -148,7 +148,7 @@ private:
 
 class PagedAllocator final : public ArenaAllocator {
 public:
-	PagedAllocator(Allocator& backingAllocator, size_t pageSize = defaultPageSize);
+	explicit PagedAllocator(Allocator& backingAllocator, size_t pageSize = defaultPageSize);
 	~PagedAllocator();
 
 	void*  alloc(size_t size, size_t alignment) override;
