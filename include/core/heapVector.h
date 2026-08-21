@@ -258,6 +258,54 @@ public:
 		return removed;
 	}
 
+	template <typename... Args>
+	iterator emplace(const_iterator pos, Args&&... args) {
+		assert(pos >= _data && pos <= _data + _size);
+		const size_t index = static_cast<size_t>(pos - _data);
+		return emplace_at(index, std::forward<Args>(args)...);
+	};
+
+	template <typename... Args>
+	iterator emplace_at(size_t index, Args&&... args) {
+		if (_size == _cap) {
+			reallocate(grow_to(_size + 1));
+		}
+
+		iterator insert_pos = _data + index;
+		iterator end_it = _data + _size;
+
+		if (insert_pos == end_it) {
+			::new (insert_pos) T(std::forward<Args>(args)...);
+		}
+		else if constexpr (std::is_trivially_copyable_v<T>) {
+			std::memmove(insert_pos + 1, insert_pos, static_cast<size_t>(end_it - insert_pos) * sizeof(T));
+			::new (insert_pos) T(std::forward<Args>(args)...);
+		}
+		else {
+			// Construct the new tail slot from the current last element (uninitialized -> move-construct).
+			::new (end_it) T(std::move(*(end_it - 1)));
+
+			// Shift everything else right by one via move-assignment (already-constructed slots).
+			for (iterator it = end_it - 1; it != insert_pos; --it) {
+				*it = std::move(*(it - 1));
+			}
+
+			// insert_pos now holds a moved-from value; overwrite it with the new element.
+			*insert_pos = T(std::forward<Args>(args)...);
+		}
+
+		++_size;
+		return insert_pos;
+	}
+
+	iterator insert(const_iterator pos, const T& value) requires(std::is_copy_constructible_v<T>) {
+		return emplace(pos, value);
+	}
+
+	iterator insert(const_iterator pos, T&& value) {
+		return emplace(pos, std::move(value));
+	}
+
 	// ---- iterators ----
 	iterator begin() {
 		return _data;

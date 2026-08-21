@@ -90,7 +90,7 @@ void* BufferAllocator::alloc(size_t size, size_t alignment) {
 void* BufferAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
 	if (ptr && lastAlloc == ptr) {
 		// Extend last allocation
-		assert(isAligned(ptr, alignment));
+		assert(isPointerAligned(ptr, alignment));
 		if (reinterpret_cast<uintptr_t>(ptr) + newSize > reinterpret_cast<uintptr_t>(buffer) + bufferSize) {
 			return nullptr; // out of memory
 		}
@@ -216,7 +216,7 @@ void* PagedAllocator::alloc(size_t size, size_t alignment) {
 void* PagedAllocator::realloc(void* ptr, size_t currSize, size_t newSize, size_t alignment) {
 	if (ptr && lastAllocation == ptr) {
 		assert(currPage);
-		assert(isAligned(ptr, alignment));
+		assert(isPointerAligned(ptr, alignment));
 		size_t freeSize = (pageSize - sizeof(Page)) - pointerDiffU(currPage->buffer, ptr);
 		if (freeSize >= newSize) {
 			currPage->offset = advancePointer(ptr, newSize);

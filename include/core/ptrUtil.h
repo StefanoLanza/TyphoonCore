@@ -23,7 +23,7 @@ inline void* advancePointer(void* ptr, ptrdiff_t offset) {
 	return static_cast<std::byte*>(ptr) + offset;
 }
 
-inline bool isAligned(const void* ptr, size_t alignment) {
+inline bool isPointerAligned(const void* ptr, size_t alignment) {
 	return reinterpret_cast<uintptr_t>(ptr) % alignment == 0;
 }
 

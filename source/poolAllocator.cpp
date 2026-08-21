@@ -38,7 +38,7 @@ void* BasePoolAllocator::alloc() {
 		// Obtain one element from the head of the free list
 		FreeSlot* const head = nextFreeSlot;
 		nextFreeSlot = head->next;
-		assert(isAligned(head, alignment));
+		assert(isPointerAligned(head, alignment));
 		return head;
 	}
 	return nullptr;
@@ -49,7 +49,7 @@ void BasePoolAllocator::free(void* ptr) {
 	debug();
 #endif
 	assert(ptr >= buffer && ptr < (static_cast<char*>(buffer) + maxElements * elementSize));
-	assert(isAligned(ptr, alignment));
+	assert(isPointerAligned(ptr, alignment));
 	// put the returned element at the head of the free list
 	FreeSlot* head = static_cast<FreeSlot*>(ptr);
 	head->next = nextFreeSlot;
