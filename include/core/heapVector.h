@@ -49,9 +49,26 @@ public:
 		_size = list.size();
 	}
 
-	// not copyable
-	HeapVector(const HeapVector&) = delete;
-	HeapVector& operator=(const HeapVector&) = delete;
+	HeapVector(const HeapVector& o) requires(std::is_copy_constructible_v<T>)
+	    : _allocator { o._allocator }
+	    , _data { nullptr }
+	    , _size { 0 }
+	    , _cap { 0 } {
+		reserve(o._size);
+		std::uninitialized_copy(o._data, o._data + o._size, _data);
+		_size = o._size;
+	}
+
+	HeapVector& operator=(const HeapVector& o) requires(std::is_copy_constructible_v<T>) {
+		if (this != &o) {
+			assert(_allocator == o._allocator && "Copy-assigning between vectors with different allocators");
+			clear();
+			reserve(o._size);
+			std::uninitialized_copy(o._data, o._data + o._size, _data);
+			_size = o._size;
+		}
+		return *this;
+	}
 
 	HeapVector(HeapVector&& o)
 	    : _allocator { o._allocator }
