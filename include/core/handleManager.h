@@ -1,51 +1,57 @@
 #pragma once
 
 #include "handle.h"
-#include <cassert>
-#include <core/base.h>
 #include <cstddef>
 #include <vector>
 
 namespace Typhoon {
 
-class HandleManager {
+class HandleAllocator final {
 public:
-	explicit HandleManager(size_t reservedCapacity = 0);
-	~HandleManager();
+	explicit HandleAllocator(size_t reservedCapacity = 0);
 
-	Handle AcquireHandle();
-	// \return index of deleted element
-	// Use as element[index] = elements.back(); elements.pop_back();
-	uint          ReleaseElementByHandle(Handle handle);
-	size_t        GetSize() const;
-	void          ReleaseAll();
-	uint          GetIndex(Handle handle) const;
-	size_t        GetCount() const;
-	Handle        GetHandle(size_t index) const;
-	bool          IsValid(Handle handle) const;
-	const uint32* GetHandleToIndexTable() const {
-		return m_sparseToDense.data();
-	}
+	Handle acquire();
+	void   release(Handle handle);
+	bool   isValid(Handle handle) const;
+	void   releaseAll();
 
 private:
-	std::vector<uint32> m_sparseToDense;
-	std::vector<uint32> m_denseToSparse;
-	std::vector<uint8>  m_generations;
-	int                 m_freeHandle;
+	static constexpr uint32_t invalidIndex = 0x00FFFFFFu;
+
+	struct Entry {
+		uint32_t nextFree : 24;
+		uint32_t generation : 8;
+	};
+	static_assert(sizeof(Entry) == sizeof(uint32_t));
+
+	std::vector<Entry> entries;
+	uint32_t           freeHandle;
 };
 
-inline uint HandleManager::GetIndex(Handle handle) const {
-	assert(IsValid(handle));
-	return m_sparseToDense[handle.index];
-}
+class DenseIndexMap final {
+public:
+	using Index = uint32_t;
 
-inline Handle HandleManager::GetHandle(size_t elementIndex) const {
-	Handle handle;
-	handle.index = m_denseToSparse[elementIndex];
-	handle.generation = m_generations[handle.index];
-	return handle;
-}
+	explicit DenseIndexMap(size_t reservedCapacity = 0);
 
-void mapHandlesToIndices(uint32_t* indices, const Handle* handles, const uint32_t* sparseToDense, size_t numHandles);
+	Index           insert(Handle handle);
+	Index           remove(Handle handle);
+	Index           getIndex(Handle handle) const;
+	Handle          getHandle(Index index) const;
+	size_t          size() const;
+	bool            empty() const;
+	void            clear();
+	const uint32_t* getSparseToDenseTable() const;
+
+private:
+	static constexpr Index invalidIndex = std::numeric_limits<Index>::max();
+
+	void ensureSparseCapacity(uint32_t handleIndex);
+
+	// Handle index -> dense index.
+	std::vector<Index> sparseToDense;
+	// Dense index -> complete Handle.
+	std::vector<uint32_t> denseToSparse;
+};
 
 } // namespace Typhoon

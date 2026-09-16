@@ -53,13 +53,27 @@ void registerTypeName(TypeId id, const char* typeName) {
 	// else already registered
 }
 
-#if 0
-constexpr auto intTypeId = getTypeId<int>();
+#if 1
+constexpr auto intTypeId = typeId_v<int>;
 constexpr auto floatTypeId = getTypeId<float>();
 constexpr auto u64TypeId = getTypeId<unsigned __int64>();
 constexpr auto size_tTypeId = getTypeId<size_t>();
 static_assert(intTypeId != floatTypeId);
 static_assert(size_tTypeId == u64TypeId);
+namespace {
+struct A;
+struct B;
+static_assert(getTypeId<int>() == getTypeId<int>());
+static_assert(getTypeId<int>() != getTypeId<float>());
+static_assert(getTypeId<int>() == getTypeId<const int>());
+// static_assert(getTypeId<int>() == getTypeId<int&>());
+// static_assert(getTypeId<int>() == getTypeId<const int&>());
+static_assert(getTypeId<int*>() != getTypeId<const int*>());
+static_assert(getTypeId<A>() != getTypeId<B>()); // works on incomplete types
+static_assert(! static_cast<bool>(nullTypeId));
+static_assert(typeId_v<int> == getTypeId<int>());
 #endif
+
+} // namespace
 
 } // namespace Typhoon

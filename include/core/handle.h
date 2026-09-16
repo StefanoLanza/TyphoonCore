@@ -5,59 +5,75 @@
 namespace Typhoon {
 
 struct Handle {
-	using Storage = uint32_t;
-	uint32_t index : 24;
-	uint32_t generation : 8;
+	static constexpr uint32_t indexBits = 24;
+	static constexpr uint32_t generationBits = 8;
+	static constexpr uint32_t invalidIndex = (1u << indexBits) - 1u;
+
+	uint32_t index : indexBits;
+	uint32_t generation : generationBits;
 
 	constexpr Handle()
 	    : index(0)
 	    , generation(0) {
 	}
-	Handle(uint32_t index, uint32_t generation)
-	    : index(index)
-	    , generation(generation) {
+
+	constexpr Handle(uint32_t index_, uint32_t generation_)
+	    : index(index_)
+	    , generation(generation_) {
 	}
-	explicit Handle(uint32_t value) {
-		set(value);
+
+	explicit constexpr Handle(uint32_t value)
+	    : index(value >> generationBits)
+	    , generation(value & 0xffu) {
 	}
-	void set(uint32_t index_, uint32_t generation_) {
+
+	constexpr void set(uint32_t index_, uint32_t generation_) {
 		index = index_;
 		generation = generation_;
 	}
-	void set(uint32_t value) {
-		index = value >> 8;
-		generation = value & 0xFF;
+
+	constexpr void set(uint32_t value) {
+		index = value >> generationBits;
+		generation = value & 0xffu;
 	}
-	uint32_t getIndex() const {
+
+	constexpr uint32_t getIndex() const {
 		return index;
 	}
-	uint32_t getGeneration() const {
+
+	constexpr uint32_t getGeneration() const {
 		return generation;
 	}
-	uint32_t get() const {
-		return (index << 8) | (generation);
+
+	constexpr uint32_t get() const {
+		return (index << generationBits) | generation;
 	}
-	explicit operator bool() const {
-		return get() != 0;
+
+	constexpr bool isNull() const {
+		return index == 0 && generation == 0;
 	}
-	void reset() {
+
+	constexpr bool isValid() const {
+		return ! isNull();
+	}
+
+	constexpr explicit operator bool() const {
+		return ! isNull();
+	}
+
+	constexpr void reset() {
 		index = 0;
 		generation = 0;
 	}
-	bool isValid() const {
-		return get() != 0;
-	}
-	bool isNull() const {
-		return get() == 0;
-	}
 };
 
-static constexpr Handle nullHandle;
+static constexpr Handle nullHandle {};
 
-inline bool operator==(const Handle& a, const Handle& b) {
-	return a.index == b.index && a.generation == b.generation;
+constexpr bool operator==(Handle a, Handle b) {
+	return a.get() == b.get();
 }
-inline bool operator!=(const Handle& a, const Handle& b) {
+
+constexpr bool operator!=(Handle a, Handle b) {
 	return ! (a == b);
 }
 

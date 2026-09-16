@@ -3,98 +3,131 @@
 
 namespace Typhoon {
 
-void mapHandlesToIndices(uint32_t* indices, const Handle* handles, const uint32_t* sparseToDense, size_t numHandles) {
-	for (size_t i = 0; i < numHandles; ++i) {
-		indices[i] = sparseToDense[handles[i].index];
-	}
+HandleAllocator::HandleAllocator(size_t reservedCapacity)
+    : freeHandle(invalidIndex) {
+	entries.reserve(reservedCapacity);
 }
 
-namespace {
+Handle HandleAllocator::acquire() {
+	uint32_t index;
 
-void incGeneration(uint8_t& g) {
-	++g;
-	// Reserve g == 0 for null handle
-	if (g == 0) {
-		g = 1;
+	if (freeHandle != invalidIndex) {
+		index = freeHandle;
+		Entry& entry = entries[index];
+		freeHandle = entry.nextFree;
+		// An allocated entry is marked by InvalidIndex.
+		entry.nextFree = invalidIndex;
+		return Handle(index, entry.generation);
 	}
+
+	index = static_cast<uint32_t>(entries.size());
+
+	// 24 bits are available for the index.
+	assert(index < invalidIndex);
+
+	entries.push_back({
+	    invalidIndex, // nextFree: allocated
+	    1             // generation
+	});
+
+	return Handle { index, 1 };
 }
 
-} // namespace
+void HandleAllocator::release(Handle handle) {
+	assert(isValid(handle));
 
-HandleManager::HandleManager(size_t reservedCapacity)
-    : m_freeHandle(-1) {
-	if (reservedCapacity > 0) {
-		m_generations.reserve(reservedCapacity);
-		m_denseToSparse.reserve(reservedCapacity);
-		m_sparseToDense.reserve(reservedCapacity);
+	Entry& entry = entries[handle.index];
+
+	// Advance generation so previously issued handles become stale
+	entry.generation = static_cast<uint8_t>(entry.generation + 1);
+
+	// Generation 0 is reserved for null handles
+	if (entry.generation == 0) {
+		entry.generation = 1;
 	}
+
+	// Put this entry at the head of the free list
+	entry.nextFree = freeHandle;
+	freeHandle = handle.index;
 }
 
-HandleManager::~HandleManager() = default;
-
-bool HandleManager::IsValid(Handle handle) const {
-	return (handle.index < m_generations.size()) && (m_generations[handle.index] == handle.generation);
+bool HandleAllocator::isValid(Handle handle) const {
+	if (handle.index >= entries.size()) {
+		return false;
+	}
+	const Entry& entry = entries[handle.index];
+	// Note: a null handle has generation == 0, which always fails the next check since entry.generation >= 1
+	return entry.nextFree == invalidIndex && entry.generation == handle.generation;
 }
 
-Handle HandleManager::AcquireHandle() {
-	const uint32 denseIndex = static_cast<uint32>(m_denseToSparse.size());
-
-	Handle handle;
-	if (m_freeHandle == -1) {
-		// Create new handle
-		handle.set(static_cast<uint32_t>(m_sparseToDense.size()), 1);
-		m_sparseToDense.push_back(denseIndex);
-		m_generations.push_back(handle.generation);
-	}
-	else {
-		// Recycle a handle that was released
-		const uint nextFree = m_sparseToDense[m_freeHandle];
-		const uint sparseIndex = m_freeHandle;
-		handle.set(sparseIndex, m_generations[sparseIndex]);
-		m_sparseToDense[sparseIndex] = denseIndex;
-		m_freeHandle = nextFree;
-	}
-	m_denseToSparse.push_back(handle.index);
-
-	return handle;
+void HandleAllocator::releaseAll() {
+	entries.clear();
+	freeHandle = invalidIndex;
 }
 
-uint HandleManager::ReleaseElementByHandle(Handle handle) {
-	assert(IsValid(handle));
-	assert(! m_denseToSparse.empty());
+DenseIndexMap::DenseIndexMap(size_t reservedCapacity) {
+	sparseToDense.reserve(reservedCapacity);
+	denseToSparse.reserve(reservedCapacity);
+}
 
-	const uint32 denseIndex = m_sparseToDense[handle.index];
+DenseIndexMap::Index DenseIndexMap::insert(Handle handle) {
+	assert(handle.isValid());
 
-	// Invalidate handle
-	incGeneration(m_generations[handle.index]);
+	const Index denseIndex = static_cast<Index>(denseToSparse.size());
 
-	// The last element is copied over the deleted one. Update its handle accordingly
-	const size_t last = m_denseToSparse.size() - 1;
-	if (denseIndex < last) {
-		const uint32 handleOfLastElement = m_denseToSparse[last];
-		m_sparseToDense[handleOfLastElement] = denseIndex;
-		// Move the released handled to the back of the indexToHandle array, so that it can be recycled
-		// std::swap(m_denseToSparse[elementIndex], m_denseToSparse[last]);
-		m_denseToSparse[denseIndex] = m_denseToSparse[last];
-	}
-	m_denseToSparse.pop_back();
+	ensureSparseCapacity(handle.index);
 
-	// Add released handle to linked list of free handles
-	m_sparseToDense[handle.index] = m_freeHandle;
-	m_freeHandle = handle.index;
+	sparseToDense[handle.index] = denseIndex;
+
+	denseToSparse.push_back(handle.get());
 
 	return denseIndex;
 }
 
-size_t HandleManager::GetSize() const {
-	return m_denseToSparse.size();
+DenseIndexMap::Index DenseIndexMap::remove(Handle handle) {
+	const Index denseIndex = sparseToDense[handle.index];
+	const Index last = static_cast<Index>(denseToSparse.size() - 1);
+	if (denseIndex != last) {
+		const Handle movedHandle = Handle(denseToSparse[last]);
+		denseToSparse[denseIndex] = denseToSparse[last];
+		sparseToDense[movedHandle.index] = denseIndex;
+	}
+	denseToSparse.pop_back();
+	sparseToDense[handle.index] = invalidIndex;
+	return denseIndex;
 }
 
-void HandleManager::ReleaseAll() {
-	m_sparseToDense.clear();
-	m_denseToSparse.clear();
-	m_generations.clear();
-	m_freeHandle = -1;
+DenseIndexMap::Index DenseIndexMap::getIndex(Handle handle) const {
+	return sparseToDense[handle.index];
+}
+
+Handle DenseIndexMap::getHandle(DenseIndexMap::Index index) const {
+	assert(index < denseToSparse.size());
+	return Handle(denseToSparse[index]);
+}
+
+size_t DenseIndexMap::size() const {
+	return denseToSparse.size();
+}
+
+bool DenseIndexMap::empty() const {
+	return denseToSparse.empty();
+}
+
+void DenseIndexMap::clear() {
+	sparseToDense.clear();
+	denseToSparse.clear();
+}
+
+const uint32_t* DenseIndexMap::getSparseToDenseTable() const {
+	return sparseToDense.data();
+}
+
+void DenseIndexMap::ensureSparseCapacity(uint32_t handleIndex) {
+	if (handleIndex < sparseToDense.size()) {
+		return;
+	}
+	sparseToDense.resize(static_cast<size_t>(handleIndex) + 1, invalidIndex);
 }
 
 } // namespace Typhoon

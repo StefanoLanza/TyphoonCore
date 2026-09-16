@@ -46,7 +46,6 @@ requires std::integral<Impl>
 	}
 
 	[[nodiscard]] Impl getValue() const {
-		assert(value != nullValue);
 		return value;
 	}
 
