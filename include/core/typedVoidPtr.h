@@ -12,7 +12,7 @@ struct VoidPtr {
 template <class T>
 inline VoidPtr makeVoidPtr(T* ptr) {
 	static_assert(! std::is_pointer_v<T>);
-	return { ptr, getTypeId<T>() };
+	return { ptr, typeId_v<T> };
 }
 
 } // namespace Typhoon

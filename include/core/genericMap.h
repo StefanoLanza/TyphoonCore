@@ -10,7 +10,7 @@ class GenericMap {
 public:
 	template <class type>
 	void insert(type* element) {
-		insert(getTypeId<type>(), element);
+		insert(typeId_v<type>, element);
 	}
 
 	void insert(void* element, TypeId typeId) {
@@ -19,14 +19,14 @@ public:
 
 	template <class type>
 	bool get(type*& element) const {
-		void* const voidPtr = find(getTypeId<type>());
+		void* const voidPtr = find(typeId_v<type>);
 		element = static_cast<type*>(voidPtr);
 		return voidPtr ? true : false;
 	}
 
 	template <class Type>
 	Type* get() const {
-		void* const voidPtr = find(getTypeId<Type>());
+		void* const voidPtr = find(typeId_v<Type>);
 		return static_cast<Type*>(voidPtr);
 	}
 
