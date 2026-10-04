@@ -68,6 +68,10 @@ requires std::integral<Impl>
 		return std::numeric_limits<Impl>::max() - 1;
 	} // 1 id reserved for null
 
+	[[nodiscard]] constexpr static Impl getNullValue() {
+		return nullValue;
+	}
+
 private:
 	Impl value;
 };
