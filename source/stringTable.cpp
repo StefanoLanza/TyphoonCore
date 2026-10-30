@@ -92,10 +92,18 @@ StringId StringTable::insert(std::string_view sv) {
 	return StringId { id };
 }
 
+StringId StringTable::insertRef(StringRef strRef) {
+	return strRef.id ? strRef.id : insert(strRef.str);
+}
+
 std::string_view StringTable::fetch(StringId strId) const {
 	assert(strId);
 	const Entry& e = getEntries()[strId.getValue()];
 	return { _buffer + e.offs, e.len };
+}
+
+std::string_view StringTable::fetchRef(StringRef strRef) const {
+	return strRef.str ? strRef.str : fetch(strRef.id);
 }
 
 bool StringTable::compare(StringId first, std::string_view second) const {

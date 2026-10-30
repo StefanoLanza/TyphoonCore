@@ -13,6 +13,7 @@ class Flags final {
 public:
 	using Enum = EnumType;
 	using ValueType = std::underlying_type<EnumType>::type;
+	static_assert(std::is_unsigned_v<ValueType>, "Flags requires an enum with an unsigned underlying type");
 
 	constexpr Flags()
 	    : bits {} {};
@@ -26,10 +27,10 @@ public:
 	}
 
 	[[nodiscard]] constexpr ValueType value() const;
-	void                              set(EnumType bit);
-	void                              unset(EnumType bit);
-	[[nodiscard]] bool                isSet(EnumType bit) const;
-	[[nodiscard]] bool                isNotSet(EnumType bit) const;
+	constexpr void                    set(EnumType bit);
+	constexpr void                    unset(EnumType bit);
+	[[nodiscard]] constexpr bool      isSet(EnumType bit) const;
+	[[nodiscard]] constexpr bool      isNotSet(EnumType bit) const;
 	constexpr Flags&                  flip(EnumType bit);
 	[[nodiscard]] constexpr bool      allOf(Flags other) const noexcept {
         return (bits & other.bits) == other.bits;
@@ -55,20 +56,22 @@ public:
 		return Flags { std::true_type {}, bits ^ r.bits };
 	}
 
-	Flags& operator|=(const Flags& r) noexcept {
+	constexpr Flags& operator|=(const Flags& r) noexcept {
 		bits |= r.bits;
 		return *this;
 	}
 
-	Flags& operator&=(const Flags& r) noexcept {
+	constexpr Flags& operator&=(const Flags& r) noexcept {
 		bits &= r.bits;
 		return *this;
 	}
 
-	Flags& operator^=(const Flags& r) noexcept {
+	constexpr Flags& operator^=(const Flags& r) noexcept {
 		bits ^= r.bits;
 		return *this;
 	}
+
+	friend constexpr bool operator==(Flags, Flags) noexcept = default;
 
 private:
 	template <class U>
@@ -86,22 +89,22 @@ inline constexpr Flags<EnumType>::ValueType Flags<EnumType>::value() const {
 }
 
 template <class EnumType>
-inline void Flags<EnumType>::set(EnumType bit) {
+inline constexpr void Flags<EnumType>::set(EnumType bit) {
 	bits |= static_cast<ValueType>(bit);
 }
 
 template <class EnumType>
-inline void Flags<EnumType>::unset(EnumType bit) {
+inline constexpr void Flags<EnumType>::unset(EnumType bit) {
 	bits &= ~static_cast<ValueType>(bit);
 }
 
 template <class EnumType>
-[[nodiscard]] inline bool Flags<EnumType>::isSet(EnumType bit) const {
+[[nodiscard]] inline constexpr bool Flags<EnumType>::isSet(EnumType bit) const {
 	return bits & static_cast<ValueType>(bit);
 }
 
 template <class EnumType>
-[[nodiscard]] inline bool Flags<EnumType>::isNotSet(EnumType bit) const {
+[[nodiscard]] inline constexpr bool Flags<EnumType>::isNotSet(EnumType bit) const {
 	return 0 == (bits & static_cast<ValueType>(bit));
 }
 
@@ -109,16 +112,6 @@ template <class EnumType>
 inline constexpr Flags<EnumType>& Flags<EnumType>::flip(EnumType bit) {
 	bits ^= static_cast<ValueType>(bit);
 	return *this;
-}
-
-template <class EnumType>
-inline constexpr bool operator==(Flags<EnumType> mask0, Flags<EnumType> mask1) noexcept {
-	return mask0.value() == mask1.value();
-}
-
-template <class EnumType>
-inline constexpr bool operator!=(Flags<EnumType> mask0, Flags<EnumType> mask1) noexcept {
-	return ! (mask0 == mask1);
 }
 
 template <class T>

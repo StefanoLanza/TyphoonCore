@@ -18,7 +18,9 @@ public:
 
 	[[nodiscard]] bool             empty() const;
 	[[nodiscard]] StringId         insert(std::string_view sv);
+	[[nodiscard]] StringId         insertRef(StringRef strRef);
 	[[nodiscard]] std::string_view fetch(StringId strId) const;
+	[[nodiscard]] std::string_view fetchRef(StringRef strRef) const;
 	[[nodiscard]] bool             compare(StringId first, std::string_view second) const;
 
 private:
