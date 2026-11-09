@@ -12,8 +12,8 @@ public:
 class Unmoveable {
 public:
 	Unmoveable() = default;
-	Unmoveable(const Uncopyable&) = delete;
-	Unmoveable& operator=(const Uncopyable&) = delete;
+	Unmoveable(const Unmoveable&) = delete;
+	Unmoveable& operator=(const Unmoveable&) = delete;
 	Unmoveable(Unmoveable&&) = delete;
 	Unmoveable& operator=(Unmoveable&&) = delete;
 };
